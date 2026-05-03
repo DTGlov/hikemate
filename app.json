@@ -1,7 +1,8 @@
 {
   "expo": {
-    "name": "hikemate",
+    "name": "HikeMate",
     "slug": "hikemate",
+    "scheme": "hikemate",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -13,7 +14,8 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.davidglover.hikemate"
     },
     "android": {
       "adaptiveIcon": {
@@ -21,10 +23,13 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "dev.davidglover.hikemate"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": ["expo-router"]
   }
 }
