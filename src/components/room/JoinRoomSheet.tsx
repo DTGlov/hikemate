@@ -12,6 +12,7 @@ import {
 import { Button } from '@/components/Button';
 import { joinRoom } from '@/hooks/useRoom';
 import { setActiveRoomId } from '@/lib/activeRoomPersistence';
+import { emailToDisplayName } from '@/lib/displayName';
 import { colorForUser } from '@/lib/memberColor';
 import { isValidRoomCode } from '@/lib/roomCode';
 import { supabase } from '@/lib/supabase';
@@ -93,7 +94,12 @@ export function JoinRoomSheet({
       return;
     }
 
-    const displayName = profileName ?? userEmail ?? 'Hiker';
+    const displayName =
+      profileName?.trim() && profileName.trim() !== userEmail
+        ? profileName.trim()
+        : userEmail
+          ? emailToDisplayName(userEmail)
+          : 'Hiker';
     const { error: joinError } = await joinRoom({
       roomId: room.id,
       userId,

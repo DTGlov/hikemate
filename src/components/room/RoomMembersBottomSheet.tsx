@@ -1,17 +1,19 @@
 import { Ionicons } from '@expo/vector-icons';
 import BottomSheet, {
   BottomSheetFlatList,
+  BottomSheetFooter,
   BottomSheetView,
+  type BottomSheetFooterProps,
 } from '@gorhom/bottom-sheet';
+import * as Clipboard from 'expo-clipboard';
+import * as Haptics from 'expo-haptics';
 import { formatDistanceToNow } from 'date-fns';
-import { useMemo, useRef } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Alert, Pressable, Share, Text, View } from 'react-native';
 
-import { RoomCodeShareButton } from '@/components/room/RoomCodeShareButton';
-import { RoomHostControls } from '@/components/room/RoomHostControls';
-import { leaveRoom } from '@/hooks/useRoom';
+import { endRoomAsHost, leaveRoom } from '@/hooks/useRoom';
 import { haversineMeters } from '@/lib/geo';
-import { initialsFromName } from '@/lib/memberColor';
+import { initialsFromDisplayName } from '@/lib/displayName';
 import { formatDistance } from '@/lib/units';
 import { useLocationStore } from '@/stores/useLocationStore';
 import { useProfileStore } from '@/stores/useProfileStore';
@@ -24,7 +26,8 @@ type Row = {
   isMe: boolean;
 };
 
-const SNAP_POINTS: string[] = ['12%', '50%', '90%'];
+const SNAP_POINTS: string[] = ['18%', '55%', '92%'];
+const COPIED_INDICATOR_MS = 1500;
 
 export function RoomMembersBottomSheet(): React.JSX.Element | null {
   const room = useRoomStore((s) => s.room);
@@ -45,7 +48,7 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
         isMe: member.user_id === myUserId,
       }))
       .sort((a, b) => {
-        // Me first, then host, then alpha by name.
+        // Me first, then host, then alphabetical.
         if (a.isMe !== b.isMe) return a.isMe ? -1 : 1;
         const aHost = room?.host_id === a.member.user_id;
         const bHost = room?.host_id === b.member.user_id;
@@ -53,6 +56,19 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
         return a.member.display_name.localeCompare(b.member.display_name);
       });
   }, [members, livePositions, myUserId, room?.host_id]);
+
+  const onlyMember = rows.length === 1 && rows[0]?.isMe;
+
+  const renderFooter = useCallback(
+    (props: BottomSheetFooterProps) => (
+      <BottomSheetFooter {...props} bottomInset={0}>
+        <View className="border-t border-gray-100 bg-white px-4 py-3">
+          {isHost ? <EndRoomButton /> : <LeaveRoomButton />}
+        </View>
+      </BottomSheetFooter>
+    ),
+    [isHost],
+  );
 
   if (!room) return null;
 
@@ -63,30 +79,29 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
       index={1}
       enablePanDownToClose={false}
       backgroundStyle={{ backgroundColor: '#ffffff' }}
-      handleIndicatorStyle={{ backgroundColor: '#cbd5e1' }}
+      handleIndicatorStyle={{
+        backgroundColor: '#cbd5e1',
+        width: 36,
+        height: 6,
+      }}
+      footerComponent={renderFooter}
     >
-      <BottomSheetView style={{ paddingHorizontal: 20, paddingBottom: 12 }}>
-        <View className="flex-row items-center justify-between gap-3">
-          <View className="flex-1">
-            <Text className="text-xs uppercase tracking-wide text-gray-500">
-              Room
-            </Text>
-            <Text className="text-2xl font-bold tracking-[3px] text-teal-700">
-              {room.code}
-            </Text>
-          </View>
-          <RoomCodeShareButton code={room.code} />
-        </View>
-        <View className="mt-3 flex-row gap-2">
-          {isHost ? <RoomHostControls /> : null}
-          <LeaveRoomButton />
-        </View>
+      <BottomSheetView style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+        <RoomHeader code={room.code} />
+        <View className="my-4 h-px bg-gray-100" />
+        <Text className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+          Members · {rows.length}
+        </Text>
       </BottomSheetView>
 
       <BottomSheetFlatList
         data={rows}
         keyExtractor={(row) => row.member.user_id}
-        contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 32 }}
+        contentContainerStyle={{
+          paddingHorizontal: 16,
+          paddingTop: 8,
+          paddingBottom: 96, // space for sticky footer
+        }}
         ItemSeparatorComponent={() => <View className="h-px bg-gray-100" />}
         renderItem={({ item }) => (
           <MemberRow
@@ -96,8 +111,81 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
             unitSystem={unitSystem}
           />
         )}
+        ListFooterComponent={
+          onlyMember ? (
+            <Text className="mt-4 text-center text-sm italic text-gray-500">
+              Waiting for hikers to join…
+            </Text>
+          ) : null
+        }
       />
     </BottomSheet>
+  );
+}
+
+function RoomHeader({ code }: { code: string }): React.JSX.Element {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (!copied) return;
+    const id = setTimeout(() => setCopied(false), COPIED_INDICATOR_MS);
+    return (): void => clearTimeout(id);
+  }, [copied]);
+
+  const onCopy = async (): Promise<void> => {
+    await Clipboard.setStringAsync(code);
+    void Haptics.selectionAsync().catch(() => undefined);
+    setCopied(true);
+  };
+
+  const onShare = async (): Promise<void> => {
+    void Haptics.selectionAsync().catch(() => undefined);
+    try {
+      await Share.share({
+        message: `Join my hike on HikeMate — code ${code}\nhikemate://room/${code}`,
+      });
+    } catch (err) {
+      console.warn('Share failed', err);
+    }
+  };
+
+  return (
+    <View className="gap-2">
+      <Text className="text-xs font-semibold uppercase tracking-wider text-gray-500">
+        Room
+      </Text>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`Copy room code ${code}`}
+        onPress={() => void onCopy()}
+        className="self-start active:opacity-70"
+      >
+        <Text
+          style={{
+            fontSize: 28,
+            fontWeight: '700',
+            letterSpacing: 4,
+            fontFamily: 'Menlo',
+            color: '#0f766e',
+          }}
+        >
+          {code}
+        </Text>
+        <Text className="mt-0.5 text-xs text-gray-500">
+          {copied ? 'Code copied' : 'Tap to copy'}
+        </Text>
+      </Pressable>
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Share room code"
+        onPress={() => void onShare()}
+        className="mt-1 h-12 flex-row items-center justify-center gap-2 rounded-xl bg-teal-700 active:bg-teal-800"
+      >
+        <Ionicons name="share-outline" size={18} color="#ffffff" />
+        <Text className="text-base font-semibold text-white">Share Code</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -124,37 +212,39 @@ function MemberRow({
     return formatDistance(meters, unitSystem);
   })();
 
-  const lastSeenText = (() => {
+  const statusText = (() => {
     if (!position) return 'Hasn’t shared a position yet';
-    if (isOnline) return 'Online';
-    return `Last seen ${formatDistanceToNow(position.timestamp, { addSuffix: true })}`;
+    if (isOnline) return 'Online · just now';
+    return `Offline · ${formatDistanceToNow(position.timestamp, { addSuffix: true })}`;
   })();
 
   return (
-    <View
-      accessibilityRole="text"
-      accessibilityLabel={`${member.display_name}${isHostRow ? ', host' : ''}, ${lastSeenText}`}
-      className="flex-row items-center gap-3 py-3"
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${member.display_name}${isMe ? ', you' : ''}${isHostRow ? ', host' : ''}, ${statusText}`}
+      android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
+      style={{ minHeight: 44 }}
+      className="flex-row items-center gap-3 py-3 active:bg-gray-50"
     >
       <View
         style={{
-          width: 40,
-          height: 40,
-          borderRadius: 20,
+          width: 44,
+          height: 44,
+          borderRadius: 22,
           backgroundColor: member.color,
           alignItems: 'center',
           justifyContent: 'center',
-          opacity: isOnline ? 1 : 0.6,
+          opacity: isOnline ? 1 : 0.55,
         }}
       >
-        <Text style={{ color: '#fff', fontWeight: '700' }}>
-          {initialsFromName(member.display_name)}
+        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+          {initialsFromDisplayName(member.display_name)}
         </Text>
       </View>
       <View className="flex-1">
-        <View className="flex-row items-center gap-2">
+        <View className="flex-row items-center gap-1.5">
           <Text
-            className="text-base font-semibold text-gray-900"
+            className="flex-shrink text-base font-semibold text-gray-900"
             numberOfLines={1}
           >
             {member.display_name}
@@ -165,7 +255,7 @@ function MemberRow({
           ) : null}
         </View>
         <Text className="text-xs text-gray-500" numberOfLines={1}>
-          {lastSeenText}
+          {statusText}
         </Text>
       </View>
       {distanceText ? (
@@ -174,27 +264,91 @@ function MemberRow({
         </Text>
       ) : null}
       <View
+        accessibilityElementsHidden
         style={{
           width: 8,
           height: 8,
           borderRadius: 4,
-          backgroundColor: isOnline ? '#22c55e' : '#9ca3af',
+          backgroundColor: member.color,
         }}
       />
-    </View>
+    </Pressable>
   );
 }
 
 function LeaveRoomButton(): React.JSX.Element {
+  const [isWorking, setIsWorking] = useState(false);
+
+  const onPress = (): void => {
+    Alert.alert('Leave room?', 'You can rejoin anytime with the code.', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Leave',
+        style: 'destructive',
+        onPress: async () => {
+          setIsWorking(true);
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+            () => undefined,
+          );
+          await leaveRoom();
+          setIsWorking(false);
+        },
+      },
+    ]);
+  };
+
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Leave room"
-      onPress={() => void leaveRoom()}
-      className="h-11 flex-row items-center gap-2 rounded-full border border-gray-200 bg-white px-5 active:bg-gray-50"
+      disabled={isWorking}
+      onPress={onPress}
+      className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-red-200 bg-white active:bg-red-50"
     >
-      <Ionicons name="exit-outline" size={18} color="#374151" />
-      <Text className="text-sm font-semibold text-gray-700">Leave</Text>
+      <Ionicons name="exit-outline" size={18} color="#dc2626" />
+      <Text className="text-base font-semibold text-red-600">Leave Room</Text>
+    </Pressable>
+  );
+}
+
+function EndRoomButton(): React.JSX.Element {
+  const [isWorking, setIsWorking] = useState(false);
+
+  const onPress = (): void => {
+    Alert.alert(
+      'End this room?',
+      'All members will be disconnected. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'End Room',
+          style: 'destructive',
+          onPress: async () => {
+            setIsWorking(true);
+            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(
+              () => undefined,
+            );
+            const { error } = await endRoomAsHost();
+            setIsWorking(false);
+            if (error) Alert.alert('Could not end room', error);
+          },
+        },
+      ],
+    );
+  };
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="End room for everyone"
+      disabled={isWorking}
+      onPress={onPress}
+      className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-red-200 bg-white active:bg-red-50"
+    >
+      <Ionicons name="stop-circle-outline" size={18} color="#dc2626" />
+      <Text className="text-base font-semibold text-red-600">
+        End Room for Everyone
+      </Text>
     </Pressable>
   );
 }

@@ -14,6 +14,7 @@ import {
 
 import { Button } from '@/components/Button';
 import { setActiveRoomId } from '@/lib/activeRoomPersistence';
+import { emailToDisplayName } from '@/lib/displayName';
 import { colorForUser } from '@/lib/memberColor';
 import { createRoom } from '@/hooks/useRoom';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -38,7 +39,12 @@ export function CreateRoomSheet({
   const [error, setError] = useState<string | null>(null);
   const [createdRoom, setCreatedRoom] = useState<HikeRoom | null>(null);
 
-  const displayName = profileName ?? userEmail ?? 'Hiker';
+  const displayName =
+    profileName?.trim() && profileName.trim() !== userEmail
+      ? profileName.trim()
+      : userEmail
+        ? emailToDisplayName(userEmail)
+        : 'Hiker';
 
   const handleCreate = async (): Promise<void> => {
     if (!userId) return;

@@ -1,7 +1,7 @@
 import { PointAnnotation } from '@rnmapbox/maps';
 import { Text, View } from 'react-native';
 
-import { initialsFromName } from '@/lib/memberColor';
+import { initialsFromDisplayName } from '@/lib/displayName';
 import type { MemberLivePosition, RoomMember } from '@/types/room';
 
 type Props = {
@@ -15,7 +15,7 @@ export function RoomMemberDot({
   position,
   onSelected,
 }: Props): React.JSX.Element {
-  const initials = initialsFromName(member.display_name);
+  const initials = initialsFromDisplayName(member.display_name);
 
   return (
     <PointAnnotation

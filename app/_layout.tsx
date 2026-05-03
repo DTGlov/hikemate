@@ -15,6 +15,7 @@ import {
   getPendingRoomCode,
   setPendingRoomCode,
 } from '@/lib/activeRoomPersistence';
+import { emailToDisplayName } from '@/lib/displayName';
 import { colorForUser } from '@/lib/memberColor';
 import { initMapbox } from '@/lib/mapbox';
 import { isValidRoomCode } from '@/lib/roomCode';
@@ -136,7 +137,12 @@ export default function RootLayout(): React.JSX.Element {
         await clearActiveRoomId();
         return;
       }
-      const displayName = profileName ?? userEmail ?? 'Hiker';
+      const displayName =
+        profileName?.trim() && profileName.trim() !== userEmail
+          ? profileName.trim()
+          : userEmail
+            ? emailToDisplayName(userEmail)
+            : 'Hiker';
       const { error: joinError } = await joinRoom({
         roomId: room.id,
         userId,
@@ -154,7 +160,12 @@ export default function RootLayout(): React.JSX.Element {
       const pending = await getPendingRoomCode();
       if (!pending) return;
       await clearPendingRoomCode();
-      const displayName = profileName ?? userEmail ?? 'Hiker';
+      const displayName =
+        profileName?.trim() && profileName.trim() !== userEmail
+          ? profileName.trim()
+          : userEmail
+            ? emailToDisplayName(userEmail)
+            : 'Hiker';
       const { error } = await joinRoomByCode({
         code: pending,
         userId,
@@ -178,8 +189,14 @@ export default function RootLayout(): React.JSX.Element {
         return;
       }
       const profile = useProfileStore.getState().profile;
+      const currentEmail = useAuthStore.getState().user?.email ?? null;
+      const profileTrimmed = profile?.display_name?.trim() ?? '';
       const displayName =
-        profile?.display_name ?? useAuthStore.getState().user?.email ?? 'Hiker';
+        profileTrimmed && profileTrimmed !== currentEmail
+          ? profileTrimmed
+          : currentEmail
+            ? emailToDisplayName(currentEmail)
+            : 'Hiker';
       const { error } = await joinRoomByCode({
         code,
         userId: currentUserId,

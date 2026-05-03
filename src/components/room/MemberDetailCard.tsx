@@ -3,7 +3,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { Pressable, Text, View } from 'react-native';
 
 import { haversineMeters } from '@/lib/geo';
-import { initialsFromName } from '@/lib/memberColor';
+import { initialsFromDisplayName } from '@/lib/displayName';
 import { formatDistance } from '@/lib/units';
 import { useLocationStore } from '@/stores/useLocationStore';
 import { useProfileStore } from '@/stores/useProfileStore';
@@ -59,7 +59,7 @@ export function MemberDetailCard({
           }}
         >
           <Text style={{ color: '#fff', fontWeight: '700' }}>
-            {initialsFromName(member.display_name)}
+            {initialsFromDisplayName(member.display_name)}
           </Text>
         </View>
         <View className="flex-1">
