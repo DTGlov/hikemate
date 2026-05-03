@@ -17,7 +17,9 @@
       "supportsTablet": true,
       "bundleIdentifier": "dev.davidglover.hikemate",
       "infoPlist": {
-        "NSFaceIDUsageDescription": "HikeMate uses Face ID to keep your hike data private."
+        "NSFaceIDUsageDescription": "HikeMate uses Face ID to keep your hike data private.",
+        "NSLocationWhenInUseUsageDescription": "HikeMate uses your location to show you on the map and track your hikes.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "HikeMate uses your location to track hikes even when the app is in the background. (We'll request this in a later phase — placeholder for now.)"
       },
       "appleTeamId": "3XF8467583"
     },
@@ -31,7 +33,9 @@
       "package": "dev.davidglover.hikemate",
       "permissions": [
         "android.permission.USE_BIOMETRIC",
-        "android.permission.USE_FINGERPRINT"
+        "android.permission.USE_FINGERPRINT",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ]
     },
     "web": {
@@ -45,6 +49,12 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "HikeMate uses Face ID to keep your hike data private."
+        }
+      ],
+      [
+        "@rnmapbox/maps",
+        {
+          "RNMapboxMapsImpl": "mapbox"
         }
       ]
     ]

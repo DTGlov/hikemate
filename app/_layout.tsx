@@ -2,7 +2,9 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import { useEffect } from 'react';
 import { ActivityIndicator, AppState, View } from 'react-native';
 
+import { initMapbox } from '@/lib/mapbox';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useLocationStore } from '@/stores/useLocationStore';
 
 import '../global.css';
 
@@ -14,8 +16,17 @@ export default function RootLayout(): React.JSX.Element {
     (state) => state.setBiometricUnlocked,
   );
 
+  const loadLastKnownLocation = useLocationStore(
+    (state) => state.loadLastKnownLocation,
+  );
+
   const router = useRouter();
   const segments = useSegments();
+
+  useEffect(() => {
+    initMapbox();
+    void loadLastKnownLocation();
+  }, [loadLastKnownLocation]);
 
   useEffect(() => {
     void initialize();
