@@ -18,7 +18,8 @@
       "bundleIdentifier": "dev.davidglover.hikemate",
       "infoPlist": {
         "NSFaceIDUsageDescription": "HikeMate uses Face ID to keep your hike data private."
-      }
+      },
+      "appleTeamId": "3XF8467583"
     },
     "android": {
       "adaptiveIcon": {
@@ -27,7 +28,11 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "dev.davidglover.hikemate"
+      "package": "dev.davidglover.hikemate",
+      "permissions": [
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
