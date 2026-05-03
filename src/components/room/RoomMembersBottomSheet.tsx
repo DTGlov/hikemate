@@ -1,24 +1,28 @@
-import { Ionicons } from '@expo/vector-icons';
-import BottomSheet, {
-  BottomSheetFlatList,
-  BottomSheetFooter,
-  BottomSheetView,
-  type BottomSheetFooterProps,
-} from '@gorhom/bottom-sheet';
+import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
+import { formatDistanceToNow } from 'date-fns';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { formatDistanceToNow } from 'date-fns';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 
 import { endRoomAsHost, leaveRoom } from '@/hooks/useRoom';
-import { haversineMeters } from '@/lib/geo';
 import { initialsFromDisplayName } from '@/lib/displayName';
-import { formatDistance } from '@/lib/units';
-import { useLocationStore } from '@/stores/useLocationStore';
-import { useProfileStore } from '@/stores/useProfileStore';
 import { useRoomStore } from '@/stores/useRoomStore';
 import type { MemberLivePosition, RoomMember } from '@/types/room';
+
+const SNAP_POINTS: string[] = ['18%', '55%', '92%'];
+const COPIED_INDICATOR_MS = 1500;
+
+const COLOR = {
+  text: '#111827',
+  muted: '#6b7280',
+  divider: '#e5e7eb',
+  brand: '#0f766e',
+  brandActive: '#0e6b63',
+  danger: '#dc2626',
+  dangerBorder: '#fecaca',
+  white: '#ffffff',
+};
 
 type Row = {
   member: RoomMember;
@@ -26,8 +30,11 @@ type Row = {
   isMe: boolean;
 };
 
-const SNAP_POINTS: string[] = ['18%', '55%', '92%'];
-const COPIED_INDICATOR_MS = 1500;
+function statusLine(position: MemberLivePosition | null): string {
+  if (!position) return 'Waiting for first position';
+  if (position.isOnline) return 'Online · just now';
+  return `Offline · ${formatDistanceToNow(position.timestamp, { addSuffix: true })}`;
+}
 
 export function RoomMembersBottomSheet(): React.JSX.Element | null {
   const room = useRoomStore((s) => s.room);
@@ -35,8 +42,6 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
   const livePositions = useRoomStore((s) => s.livePositions);
   const myUserId = useRoomStore((s) => s.myUserId);
   const isHost = useRoomStore((s) => s.isHost);
-  const myLocation = useLocationStore((s) => s.currentLocation);
-  const unitSystem = useProfileStore((s) => s.profile?.unit_system ?? 'metric');
 
   const sheetRef = useRef<BottomSheet>(null);
 
@@ -48,7 +53,6 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
         isMe: member.user_id === myUserId,
       }))
       .sort((a, b) => {
-        // Me first, then host, then alphabetical.
         if (a.isMe !== b.isMe) return a.isMe ? -1 : 1;
         const aHost = room?.host_id === a.member.user_id;
         const bHost = room?.host_id === b.member.user_id;
@@ -56,19 +60,6 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
         return a.member.display_name.localeCompare(b.member.display_name);
       });
   }, [members, livePositions, myUserId, room?.host_id]);
-
-  const onlyMember = rows.length === 1 && rows[0]?.isMe;
-
-  const renderFooter = useCallback(
-    (props: BottomSheetFooterProps) => (
-      <BottomSheetFooter {...props} bottomInset={0}>
-        <View className="border-t border-gray-100 bg-white px-4 py-3">
-          {isHost ? <EndRoomButton /> : <LeaveRoomButton />}
-        </View>
-      </BottomSheetFooter>
-    ),
-    [isHost],
-  );
 
   if (!room) return null;
 
@@ -78,47 +69,72 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
       snapPoints={SNAP_POINTS}
       index={1}
       enablePanDownToClose={false}
-      backgroundStyle={{ backgroundColor: '#ffffff' }}
+      backgroundStyle={{ backgroundColor: COLOR.white }}
       handleIndicatorStyle={{
         backgroundColor: '#cbd5e1',
         width: 36,
         height: 6,
       }}
-      footerComponent={renderFooter}
     >
-      <BottomSheetView style={{ paddingHorizontal: 16, paddingTop: 4 }}>
+      <BottomSheetView
+        style={{ flex: 1, paddingHorizontal: 16, paddingTop: 8 }}
+      >
         <RoomHeader code={room.code} />
-        <View className="my-4 h-px bg-gray-100" />
-        <Text className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-          Members · {rows.length}
-        </Text>
-      </BottomSheetView>
 
-      <BottomSheetFlatList
-        data={rows}
-        keyExtractor={(row) => row.member.user_id}
-        contentContainerStyle={{
-          paddingHorizontal: 16,
-          paddingTop: 8,
-          paddingBottom: 96, // space for sticky footer
-        }}
-        ItemSeparatorComponent={() => <View className="h-px bg-gray-100" />}
-        renderItem={({ item }) => (
+        <View
+          style={{
+            height: 1,
+            backgroundColor: COLOR.divider,
+            marginVertical: 8,
+          }}
+        />
+
+        <Text
+          style={{
+            fontSize: 11,
+            fontWeight: '600',
+            letterSpacing: 1,
+            color: COLOR.muted,
+            marginVertical: 12,
+          }}
+        >
+          MEMBERS · {rows.length}
+        </Text>
+
+        {rows.map((row) => (
           <MemberRow
-            row={item}
-            isHostRow={room.host_id === item.member.user_id}
-            myLocation={myLocation}
-            unitSystem={unitSystem}
+            key={row.member.user_id}
+            row={row}
+            isHost={room.host_id === row.member.user_id}
           />
-        )}
-        ListFooterComponent={
-          onlyMember ? (
-            <Text className="mt-4 text-center text-sm italic text-gray-500">
-              Waiting for hikers to join…
-            </Text>
-          ) : null
-        }
-      />
+        ))}
+
+        {rows.length === 1 ? (
+          <Text
+            style={{
+              fontSize: 14,
+              color: COLOR.muted,
+              fontStyle: 'italic',
+              marginVertical: 16,
+              textAlign: 'center',
+            }}
+          >
+            Waiting for hikers to join…
+          </Text>
+        ) : null}
+
+        <View style={{ flex: 1 }} />
+
+        <View
+          style={{
+            height: 1,
+            backgroundColor: COLOR.divider,
+            marginVertical: 8,
+          }}
+        />
+
+        {isHost ? <EndRoomButton /> : <LeaveRoomButton />}
+      </BottomSheetView>
     </BottomSheet>
   );
 }
@@ -150,28 +166,38 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
   };
 
   return (
-    <View className="gap-2">
-      <Text className="text-xs font-semibold uppercase tracking-wider text-gray-500">
-        Room
+    <View
+      style={{ flexDirection: 'column', gap: 8, paddingVertical: 16 }}
+    >
+      <Text
+        style={{
+          fontSize: 11,
+          fontWeight: '600',
+          letterSpacing: 1,
+          color: COLOR.muted,
+        }}
+      >
+        ROOM
       </Text>
+
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={`Copy room code ${code}`}
         onPress={() => void onCopy()}
-        className="self-start active:opacity-70"
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
       >
         <Text
           style={{
-            fontSize: 28,
-            fontWeight: '700',
-            letterSpacing: 4,
             fontFamily: 'Menlo',
-            color: '#0f766e',
+            fontSize: 24,
+            fontWeight: '700',
+            letterSpacing: 2,
+            color: COLOR.brand,
           }}
         >
           {code}
         </Text>
-        <Text className="mt-0.5 text-xs text-gray-500">
+        <Text style={{ fontSize: 12, color: COLOR.muted }}>
           {copied ? 'Code copied' : 'Tap to copy'}
         </Text>
       </Pressable>
@@ -180,10 +206,21 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
         accessibilityRole="button"
         accessibilityLabel="Share room code"
         onPress={() => void onShare()}
-        className="mt-1 h-12 flex-row items-center justify-center gap-2 rounded-xl bg-teal-700 active:bg-teal-800"
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 8,
+          height: 44,
+          borderRadius: 10,
+          backgroundColor: pressed ? COLOR.brandActive : COLOR.brand,
+        })}
       >
-        <Ionicons name="share-outline" size={18} color="#ffffff" />
-        <Text className="text-base font-semibold text-white">Share Code</Text>
+        <Text
+          style={{ color: COLOR.white, fontWeight: '600', fontSize: 15 }}
+        >
+          Share Code
+        </Text>
       </Pressable>
     </View>
   );
@@ -191,40 +228,23 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
 
 function MemberRow({
   row,
-  isHostRow,
-  myLocation,
-  unitSystem,
+  isHost: isHostRow,
 }: {
   row: Row;
-  isHostRow: boolean;
-  myLocation: { latitude: number; longitude: number } | null;
-  unitSystem: 'metric' | 'imperial';
+  isHost: boolean;
 }): React.JSX.Element {
   const { member, position, isMe } = row;
   const isOnline = position?.isOnline ?? false;
-
-  const distanceText = (() => {
-    if (isMe || !position || !myLocation) return null;
-    const meters = haversineMeters(
-      { latitude: myLocation.latitude, longitude: myLocation.longitude },
-      { latitude: position.lat, longitude: position.lng },
-    );
-    return formatDistance(meters, unitSystem);
-  })();
-
-  const statusText = (() => {
-    if (!position) return 'Hasn’t shared a position yet';
-    if (isOnline) return 'Online · just now';
-    return `Offline · ${formatDistanceToNow(position.timestamp, { addSuffix: true })}`;
-  })();
+  const status = statusLine(position);
 
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${member.display_name}${isMe ? ', you' : ''}${isHostRow ? ', host' : ''}, ${statusText}`}
-      android_ripple={{ color: 'rgba(0,0,0,0.04)' }}
-      style={{ minHeight: 44 }}
-      className="flex-row items-center gap-3 py-3 active:bg-gray-50"
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        paddingVertical: 12,
+      }}
     >
       <View
         style={{
@@ -237,34 +257,40 @@ function MemberRow({
           opacity: isOnline ? 1 : 0.55,
         }}
       >
-        <Text style={{ color: '#ffffff', fontWeight: '700', fontSize: 14 }}>
+        <Text style={{ color: COLOR.white, fontWeight: '700', fontSize: 14 }}>
           {initialsFromDisplayName(member.display_name)}
         </Text>
       </View>
-      <View className="flex-1">
-        <View className="flex-row items-center gap-1.5">
+
+      <View style={{ flex: 1, flexDirection: 'column', gap: 2 }}>
+        <View
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
+        >
           <Text
-            className="flex-shrink text-base font-semibold text-gray-900"
             numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{
+              flex: 1,
+              fontSize: 16,
+              fontWeight: '500',
+              color: COLOR.text,
+            }}
           >
             {member.display_name}
             {isMe ? ' (you)' : ''}
           </Text>
-          {isHostRow ? (
-            <Ionicons name="star" size={14} color="#0f766e" />
-          ) : null}
+          {isHostRow ? <Text style={{ fontSize: 14 }}>⭐</Text> : null}
         </View>
-        <Text className="text-xs text-gray-500" numberOfLines={1}>
-          {statusText}
+        <Text
+          numberOfLines={1}
+          ellipsizeMode="tail"
+          style={{ fontSize: 12, color: COLOR.muted }}
+        >
+          {status}
         </Text>
       </View>
-      {distanceText ? (
-        <Text className="text-sm font-medium text-gray-600">
-          {distanceText}
-        </Text>
-      ) : null}
+
       <View
-        accessibilityElementsHidden
         style={{
           width: 8,
           height: 8,
@@ -272,7 +298,7 @@ function MemberRow({
           backgroundColor: member.color,
         }}
       />
-    </Pressable>
+    </View>
   );
 }
 
@@ -303,10 +329,22 @@ function LeaveRoomButton(): React.JSX.Element {
       accessibilityLabel="Leave room"
       disabled={isWorking}
       onPress={onPress}
-      className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-red-200 bg-white active:bg-red-50"
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLOR.dangerBorder,
+        marginVertical: 8,
+        backgroundColor: pressed ? '#fef2f2' : COLOR.white,
+        opacity: isWorking ? 0.6 : 1,
+      })}
     >
-      <Ionicons name="exit-outline" size={18} color="#dc2626" />
-      <Text className="text-base font-semibold text-red-600">Leave Room</Text>
+      <Text style={{ color: COLOR.danger, fontWeight: '600', fontSize: 16 }}>
+        Leave Room
+      </Text>
     </Pressable>
   );
 }
@@ -343,10 +381,20 @@ function EndRoomButton(): React.JSX.Element {
       accessibilityLabel="End room for everyone"
       disabled={isWorking}
       onPress={onPress}
-      className="h-12 flex-row items-center justify-center gap-2 rounded-xl border border-red-200 bg-white active:bg-red-50"
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 14,
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: COLOR.dangerBorder,
+        marginVertical: 8,
+        backgroundColor: pressed ? '#fef2f2' : COLOR.white,
+        opacity: isWorking ? 0.6 : 1,
+      })}
     >
-      <Ionicons name="stop-circle-outline" size={18} color="#dc2626" />
-      <Text className="text-base font-semibold text-red-600">
+      <Text style={{ color: COLOR.danger, fontWeight: '600', fontSize: 16 }}>
         End Room for Everyone
       </Text>
     </Pressable>
