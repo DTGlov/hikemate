@@ -1,7 +1,3 @@
--- Phase 6: hike rooms (live group hike sharing)
--- Run via Supabase Dashboard → SQL Editor → New Query.
--- Safe to re-run? No — table creation will fail on the second run.
-
 -- Hike rooms table
 create table public.hike_rooms (
   id uuid primary key default gen_random_uuid(),
@@ -33,11 +29,29 @@ create table public.room_members (
 
 create index room_members_user_idx on public.room_members (user_id);
 
+-- Helper function: checks room membership without triggering RLS recursion.
+-- security definer bypasses RLS on the inner query, preventing infinite recursion
+-- when the room_members SELECT policy needs to check membership of the same table.
+create or replace function public.is_room_member(p_room_id uuid, p_user_id uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.room_members
+    where room_id = p_room_id and user_id = p_user_id
+  );
+$$;
+
+grant execute on function public.is_room_member(uuid, uuid) to authenticated;
+
 -- RLS
 alter table public.hike_rooms enable row level security;
 alter table public.room_members enable row level security;
 
--- Hike rooms: any authenticated user can read by code (for join), host can update/end
+-- Hike rooms policies
 create policy "Anyone authenticated can find rooms by code"
   on public.hike_rooms for select
   using (auth.uid() is not null);
@@ -50,14 +64,15 @@ create policy "Hosts can update their rooms"
   on public.hike_rooms for update
   using (auth.uid() = host_id);
 
--- Room members: members of a room can see other members of THE SAME room
+-- Room members policies
+-- SELECT: allow users to read their own membership row directly (handles
+-- post-insert .select() and avoids 'stable' caching gotcha with is_room_member),
+-- OR read other members in rooms they belong to.
 create policy "Members can read fellow members"
   on public.room_members for select
   using (
-    exists (
-      select 1 from public.room_members rm
-      where rm.room_id = room_members.room_id and rm.user_id = auth.uid()
-    )
+    user_id = auth.uid()
+    or public.is_room_member(room_id, auth.uid())
   );
 
 create policy "Users can join rooms (insert themselves)"
@@ -72,11 +87,12 @@ create policy "Users can leave rooms (delete themselves)"
   on public.room_members for delete
   using (auth.uid() = user_id);
 
--- RPC: end a room (sets ended_at). Only the host may invoke this.
+-- Function: end a room (sets ended_at, only callable by the host)
 create or replace function public.end_hike_room(p_room_id uuid)
 returns void
 language plpgsql
 security definer
+set search_path = public
 as $$
 begin
   if not exists (
@@ -94,35 +110,6 @@ $$;
 
 grant execute on function public.end_hike_room(uuid) to authenticated;
 
--- Trigger: auto-end a room when its last member leaves. Server-side because
--- we cannot trust the last-leaver client to call end_hike_room (they may
--- have crashed).
-create or replace function public.auto_end_empty_room()
-returns trigger
-language plpgsql
-security definer
-as $$
-declare
-  remaining int;
-begin
-  select count(*) into remaining
-  from public.room_members
-  where room_id = old.room_id;
-
-  if remaining = 0 then
-    update public.hike_rooms
-    set ended_at = now()
-    where id = old.room_id and ended_at is null;
-  end if;
-
-  return old;
-end;
-$$;
-
-create trigger room_members_auto_end_empty
-  after delete on public.room_members
-  for each row execute procedure public.auto_end_empty_room();
-
--- Realtime: enable for both tables so clients can subscribe to changes.
+-- Realtime: enable for both tables
 alter publication supabase_realtime add table public.hike_rooms;
 alter publication supabase_realtime add table public.room_members;
