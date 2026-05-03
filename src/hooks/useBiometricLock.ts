@@ -1,5 +1,6 @@
 import * as LocalAuthentication from 'expo-local-authentication';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { AppState } from 'react-native';
 
 import { useAuthStore } from '@/stores/useAuthStore';
 
@@ -85,8 +86,25 @@ export function useBiometricLock(): UseBiometricLockResult {
 
   useEffect(() => {
     if (autoTriggered.current) return;
-    autoTriggered.current = true;
-    void authenticate();
+
+    // Wait for the app to be fully active before prompting. Firing
+    // authenticateAsync while AppState is 'inactive' or 'background' (e.g.
+    // during cold-launch transitions) causes the iOS prompt to flash and
+    // immediately fail with a generic "Authentication failed" error.
+    if (AppState.currentState === 'active') {
+      autoTriggered.current = true;
+      void authenticate();
+      return;
+    }
+
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active' && !autoTriggered.current) {
+        autoTriggered.current = true;
+        sub.remove();
+        void authenticate();
+      }
+    });
+    return (): void => sub.remove();
   }, [authenticate]);
 
   return { kind, isAuthenticating, errorMessage, authenticate };

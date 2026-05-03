@@ -10,6 +10,10 @@ type AuthState = {
   user: User | null;
   isLoading: boolean;
   isBiometricUnlocked: boolean;
+  // Timestamp (ms) of the most recent successful biometric unlock. Used by
+  // BiometricGate's grace period to skip the prompt for a brief window after
+  // a successful unlock — so transient backgrounding doesn't force re-auth.
+  lastUnlockedAt: number | null;
   initialize: () => Promise<void>;
   signUp: (email: string, password: string) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
@@ -22,6 +26,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   isLoading: true,
   isBiometricUnlocked: false,
+  lastUnlockedAt: null,
 
   initialize: async (): Promise<void> => {
     const { data } = await supabase.auth.getSession();
@@ -40,7 +45,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Reset biometric unlock when the user signs out so a future login
       // re-prompts. Don't reset on token refresh (same user, new tokens).
       if (previousSession && !session) {
-        set({ isBiometricUnlocked: false });
+        set({ isBiometricUnlocked: false, lastUnlockedAt: null });
       }
     });
   },
@@ -65,12 +70,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         session: null,
         user: null,
         isBiometricUnlocked: false,
+        lastUnlockedAt: null,
       });
     }
     return { error };
   },
 
   setBiometricUnlocked: (value: boolean): void => {
-    set({ isBiometricUnlocked: value });
+    // Stamp the unlock time on success so the gate's grace period can skip
+    // re-prompting for a brief window. Don't clear the timestamp on lock —
+    // the grace window is exactly the gap between lock and re-evaluation.
+    if (value) {
+      set({ isBiometricUnlocked: true, lastUnlockedAt: Date.now() });
+    } else {
+      set({ isBiometricUnlocked: false });
+    }
   },
 }));
