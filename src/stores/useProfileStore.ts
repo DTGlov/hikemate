@@ -1,0 +1,82 @@
+import { create } from 'zustand';
+
+import { supabase } from '@/lib/supabase';
+import type { UnitSystem } from '@/lib/units';
+
+export type SubscriptionTier = 'free' | 'pro';
+
+export interface UserProfile {
+  id: string;
+  display_name: string | null;
+  unit_system: UnitSystem;
+  subscription_tier: SubscriptionTier;
+  created_at: string;
+  updated_at: string;
+}
+
+type ProfileState = {
+  profile: UserProfile | null;
+  isLoading: boolean;
+  error: string | null;
+  loadProfile: (userId: string) => Promise<void>;
+  updateUnitSystem: (next: UnitSystem) => Promise<void>;
+  updateDisplayName: (next: string) => Promise<{ error: string | null }>;
+  reset: () => void;
+};
+
+export const useProfileStore = create<ProfileState>((set, get) => ({
+  profile: null,
+  isLoading: false,
+  error: null,
+
+  loadProfile: async (userId: string): Promise<void> => {
+    set({ isLoading: true, error: null });
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    if (error) {
+      set({ isLoading: false, error: error.message });
+      return;
+    }
+    set({ profile: data as UserProfile, isLoading: false });
+  },
+
+  updateUnitSystem: async (next: UnitSystem): Promise<void> => {
+    const current = get().profile;
+    if (!current) return;
+    // Optimistic update — flip immediately so the UI is responsive.
+    set({ profile: { ...current, unit_system: next } });
+    const { error } = await supabase
+      .from('profiles')
+      .update({ unit_system: next })
+      .eq('id', current.id);
+    if (error) {
+      // Revert on failure.
+      set({ profile: current, error: error.message });
+    }
+  },
+
+  updateDisplayName: async (
+    next: string,
+  ): Promise<{ error: string | null }> => {
+    const current = get().profile;
+    if (!current) return { error: 'No profile loaded' };
+    const trimmed = next.trim();
+    set({ profile: { ...current, display_name: trimmed } });
+    const { error } = await supabase
+      .from('profiles')
+      .update({ display_name: trimmed })
+      .eq('id', current.id);
+    if (error) {
+      set({ profile: current });
+      return { error: error.message };
+    }
+    return { error: null };
+  },
+
+  reset: (): void => {
+    set({ profile: null, isLoading: false, error: null });
+  },
+}));

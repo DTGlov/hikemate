@@ -5,6 +5,7 @@ import { ActivityIndicator, AppState, View } from 'react-native';
 import { initMapbox } from '@/lib/mapbox';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useLocationStore } from '@/stores/useLocationStore';
+import { useProfileStore } from '@/stores/useProfileStore';
 
 import '../global.css';
 
@@ -16,12 +17,26 @@ export default function RootLayout(): React.JSX.Element {
     (state) => state.setBiometricUnlocked,
   );
 
+  const userId = useAuthStore((state) => state.user?.id ?? null);
+  const loadProfile = useProfileStore((state) => state.loadProfile);
+  const resetProfile = useProfileStore((state) => state.reset);
+
   const loadLastKnownLocation = useLocationStore(
     (state) => state.loadLastKnownLocation,
   );
 
   const router = useRouter();
   const segments = useSegments();
+
+  // Load the user's profile whenever the active user changes; reset on
+  // logout so we don't show stale data to the next user on this device.
+  useEffect(() => {
+    if (userId) {
+      void loadProfile(userId);
+    } else {
+      resetProfile();
+    }
+  }, [userId, loadProfile, resetProfile]);
 
   useEffect(() => {
     initMapbox();
@@ -69,6 +84,14 @@ export default function RootLayout(): React.JSX.Element {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="(tabs)" />
       <Stack.Screen name="(auth)" />
+      <Stack.Screen
+        name="hike/[id]"
+        options={{ headerShown: true, title: '' }}
+      />
+      <Stack.Screen
+        name="settings"
+        options={{ headerShown: true, title: 'Settings' }}
+      />
     </Stack>
   );
 }

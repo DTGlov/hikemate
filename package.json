@@ -14,8 +14,10 @@
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",
     "@hookform/resolvers": "^5.2.2",
+    "@mapbox/polyline": "^1.2.1",
     "@rnmapbox/maps": "^10.3.0",
     "@supabase/supabase-js": "^2.105.1",
+    "date-fns": "^4.1.0",
     "expo": "~54.0.33",
     "expo-constants": "~18.0.13",
     "expo-haptics": "~15.0.8",
