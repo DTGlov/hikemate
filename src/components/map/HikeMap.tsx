@@ -4,17 +4,26 @@ import Mapbox, {
   UserLocation,
   type MapState,
 } from '@rnmapbox/maps';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
+import { ActiveHikeOverlay } from '@/components/hike/ActiveHikeOverlay';
+import { HikePathLayer } from '@/components/hike/HikePathLayer';
+import { StartHikeButton } from '@/components/hike/StartHikeButton';
+import { StopHikeConfirmModal } from '@/components/hike/StopHikeConfirmModal';
 import { RecenterButton } from '@/components/map/RecenterButton';
+import { useHikeTracker } from '@/hooks/useHikeTracker';
+import { useLocationPermission } from '@/hooks/useLocationPermission';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
 
 const DEFAULT_ZOOM = 15;
 
 export function HikeMap(): React.JSX.Element {
   useUserLocation();
+  const { isGpsStale, permissionLost } = useHikeTracker();
+  const { request: requestLocationPermission } = useLocationPermission();
 
   const currentLocation = useLocationStore((s) => s.currentLocation);
   const lastKnownLocation = useLocationStore((s) => s.lastKnownLocation);
@@ -24,15 +33,19 @@ export function HikeMap(): React.JSX.Element {
     (s) => s.loadLastKnownLocation,
   );
 
+  const hikeStatus = useHikeTrackingStore((s) => s.status);
+  const trackingPoints = useHikeTrackingStore((s) => s.points);
+  const startHike = useHikeTrackingStore((s) => s.startHike);
+  const isHikeActive = hikeStatus === 'tracking' || hikeStatus === 'paused';
+
   const cameraRef = useRef<Camera>(null);
+  const [stopModalVisible, setStopModalVisible] = useState(false);
 
   useEffect(() => {
     void loadLastKnownLocation();
   }, [loadLastKnownLocation]);
 
-  // Once we have a real GPS fix and we're following, fly to it. The
-  // followUserLocation prop on Camera also tracks updates, but flying on
-  // the first fix gives a smoother transition from lastKnownLocation.
+  // Smooth fly-to on first GPS fix when following.
   useEffect(() => {
     if (!currentLocation || !isFollowingUser) return;
     cameraRef.current?.flyTo(
@@ -43,8 +56,6 @@ export function HikeMap(): React.JSX.Element {
 
   const onCameraChanged = useCallback(
     (state: MapState): void => {
-      // The user grabbed the map. Stop following so the camera doesn't
-      // fight the gesture. RecenterButton will reappear.
       if (state.gestures.isGestureActive && isFollowingUser) {
         setFollowingUser(false);
       }
@@ -52,8 +63,15 @@ export function HikeMap(): React.JSX.Element {
     [isFollowingUser, setFollowingUser],
   );
 
-  // Initial center: prefer last known location so the user doesn't see a
-  // blank world map while we wait for the first GPS fix.
+  const onStartHike = useCallback(async (): Promise<void> => {
+    // Re-check permission in case user toggled in Settings between map mount
+    // and pressing Start.
+    const next = await requestLocationPermission();
+    if (next !== 'granted') return;
+    setFollowingUser(true);
+    startHike();
+  }, [requestLocationPermission, setFollowingUser, startHike]);
+
   const initialCenter: [number, number] | undefined = lastKnownLocation
     ? [lastKnownLocation.longitude, lastKnownLocation.latitude]
     : undefined;
@@ -80,9 +98,10 @@ export function HikeMap(): React.JSX.Element {
           }
         />
         <UserLocation visible androidRenderMode="gps" />
+        {isHikeActive ? <HikePathLayer points={trackingPoints} /> : null}
       </MapView>
 
-      {isLocating ? (
+      {isLocating && !isHikeActive ? (
         <View className="pointer-events-none absolute left-0 right-0 top-16 items-center">
           <View className="flex-row items-center gap-2 rounded-full bg-white/95 px-4 py-2 shadow">
             <ActivityIndicator size="small" color="#0f766e" />
@@ -93,7 +112,23 @@ export function HikeMap(): React.JSX.Element {
         </View>
       ) : null}
 
-      <RecenterButton cameraRef={cameraRef} />
+      {isHikeActive ? (
+        <ActiveHikeOverlay
+          onStop={() => setStopModalVisible(true)}
+          isGpsStale={isGpsStale}
+          permissionLost={permissionLost}
+        />
+      ) : (
+        <>
+          <RecenterButton cameraRef={cameraRef} />
+          <StartHikeButton onPress={() => void onStartHike()} />
+        </>
+      )}
+
+      <StopHikeConfirmModal
+        visible={stopModalVisible}
+        onClose={() => setStopModalVisible(false)}
+      />
     </View>
   );
 }
