@@ -8,12 +8,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 
 import { ActiveHikeOverlay } from '@/components/hike/ActiveHikeOverlay';
+import { AlwaysPermissionExplainer } from '@/components/hike/AlwaysPermissionExplainer';
 import { HikePathLayer } from '@/components/hike/HikePathLayer';
 import { StartHikeButton } from '@/components/hike/StartHikeButton';
 import { StopHikeConfirmModal } from '@/components/hike/StopHikeConfirmModal';
 import { RecenterButton } from '@/components/map/RecenterButton';
-import { useHikeTracker } from '@/hooks/useHikeTracker';
-import { useLocationPermission } from '@/hooks/useLocationPermission';
+import { useAlwaysPermission } from '@/hooks/useAlwaysPermission';
+import { useBackgroundHikeTracker } from '@/hooks/useBackgroundHikeTracker';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
@@ -22,8 +23,14 @@ const DEFAULT_ZOOM = 15;
 
 export function HikeMap(): React.JSX.Element {
   useUserLocation();
-  const { isGpsStale, permissionLost } = useHikeTracker();
-  const { request: requestLocationPermission } = useLocationPermission();
+  const { isGpsStale, permissionLost } = useBackgroundHikeTracker();
+  const {
+    status: alwaysStatus,
+    hasDeclinedExplainer,
+    refresh: refreshPermission,
+    request: requestAlwaysPermission,
+    recordDeclinedExplainer,
+  } = useAlwaysPermission();
 
   const currentLocation = useLocationStore((s) => s.currentLocation);
   const lastKnownLocation = useLocationStore((s) => s.lastKnownLocation);
@@ -40,12 +47,13 @@ export function HikeMap(): React.JSX.Element {
 
   const cameraRef = useRef<Camera>(null);
   const [stopModalVisible, setStopModalVisible] = useState(false);
+  const [explainerVisible, setExplainerVisible] = useState(false);
+  const [isWorking, setIsWorking] = useState(false);
 
   useEffect(() => {
     void loadLastKnownLocation();
   }, [loadLastKnownLocation]);
 
-  // Smooth fly-to on first GPS fix when following.
   useEffect(() => {
     if (!currentLocation || !isFollowingUser) return;
     cameraRef.current?.flyTo(
@@ -63,20 +71,77 @@ export function HikeMap(): React.JSX.Element {
     [isFollowingUser, setFollowingUser],
   );
 
-  const onStartHike = useCallback(async (): Promise<void> => {
-    // Re-check permission in case user toggled in Settings between map mount
-    // and pressing Start.
-    const next = await requestLocationPermission();
-    if (next !== 'granted') return;
+  const beginHike = useCallback((): void => {
     setFollowingUser(true);
     startHike();
-  }, [requestLocationPermission, setFollowingUser, startHike]);
+  }, [setFollowingUser, startHike]);
+
+  // Start flow:
+  //   - already 'always' / 'foreground-only' → start now
+  //   - undetermined and the user hasn't declined the explainer yet →
+  //     show the explainer; choices route through onAllow / onLater
+  //   - undetermined but explainer was already declined OR denied →
+  //     try a silent system request; if granted, start; if denied,
+  //     start anyway (foreground-only) so the user can still hike,
+  //     and useBackgroundHikeTracker will surface the limitation
+  const onStartHike = useCallback(async (): Promise<void> => {
+    setIsWorking(true);
+    try {
+      const fresh = await refreshPermission();
+      if (fresh === 'always' || fresh === 'foreground-only') {
+        beginHike();
+        return;
+      }
+      if (fresh === 'undetermined' && !hasDeclinedExplainer) {
+        setExplainerVisible(true);
+        return;
+      }
+      // 'denied' or already-declined-and-still-undetermined: try whatever
+      // the system will give us. If denied permanently, request() returns
+      // 'denied' and we don't start.
+      const after = await requestAlwaysPermission();
+      if (after === 'always' || after === 'foreground-only') beginHike();
+    } finally {
+      setIsWorking(false);
+    }
+  }, [
+    beginHike,
+    hasDeclinedExplainer,
+    refreshPermission,
+    requestAlwaysPermission,
+  ]);
+
+  const onAllowAlways = useCallback(async (): Promise<void> => {
+    setIsWorking(true);
+    try {
+      const after = await requestAlwaysPermission();
+      setExplainerVisible(false);
+      if (after === 'always' || after === 'foreground-only') beginHike();
+    } finally {
+      setIsWorking(false);
+    }
+  }, [beginHike, requestAlwaysPermission]);
+
+  const onLater = useCallback(async (): Promise<void> => {
+    setIsWorking(true);
+    try {
+      await recordDeclinedExplainer();
+      // Still need at least foreground permission to do anything.
+      const after = await requestAlwaysPermission();
+      setExplainerVisible(false);
+      if (after === 'foreground-only' || after === 'always') beginHike();
+    } finally {
+      setIsWorking(false);
+    }
+  }, [beginHike, recordDeclinedExplainer, requestAlwaysPermission]);
 
   const initialCenter: [number, number] | undefined = lastKnownLocation
     ? [lastKnownLocation.longitude, lastKnownLocation.latitude]
     : undefined;
 
   const isLocating = isFollowingUser && currentLocation === null;
+  const showForegroundOnlyBanner =
+    isHikeActive && alwaysStatus === 'foreground-only';
 
   return (
     <View className="flex-1">
@@ -117,6 +182,7 @@ export function HikeMap(): React.JSX.Element {
           onStop={() => setStopModalVisible(true)}
           isGpsStale={isGpsStale}
           permissionLost={permissionLost}
+          backgroundDisabled={showForegroundOnlyBanner && !permissionLost}
         />
       ) : (
         <>
@@ -124,6 +190,13 @@ export function HikeMap(): React.JSX.Element {
           <StartHikeButton onPress={() => void onStartHike()} />
         </>
       )}
+
+      <AlwaysPermissionExplainer
+        visible={explainerVisible}
+        isWorking={isWorking}
+        onAllow={() => void onAllowAlways()}
+        onLater={() => void onLater()}
+      />
 
       <StopHikeConfirmModal
         visible={stopModalVisible}

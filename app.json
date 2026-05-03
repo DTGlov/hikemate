@@ -19,7 +19,9 @@
       "infoPlist": {
         "NSFaceIDUsageDescription": "HikeMate uses Face ID to keep your hike data private.",
         "NSLocationWhenInUseUsageDescription": "HikeMate uses your location to show you on the map and track your hikes.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "HikeMate uses your location to track hikes even when the app is in the background. (We'll request this in a later phase — placeholder for now.)"
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "HikeMate uses your location to track your hike route accurately, even when your phone is locked or the app is in the background. This is essential for recording your full hiking path.",
+        "NSLocationAlwaysUsageDescription": "HikeMate needs background location access to record your hike route while the phone is locked.",
+        "UIBackgroundModes": ["location", "fetch"]
       },
       "appleTeamId": "3XF8467583"
     },
@@ -35,7 +37,11 @@
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS"
       ]
     },
     "web": {
@@ -55,6 +61,17 @@
         "@rnmapbox/maps",
         {
           "RNMapboxMapsImpl": "mapbox"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "HikeMate uses your location to show you on the map and track your hikes.",
+          "locationAlwaysAndWhenInUsePermission": "HikeMate uses your location to track your hike route accurately, even when your phone is locked or the app is in the background. This is essential for recording your full hiking path.",
+          "locationAlwaysPermission": "HikeMate needs background location access to record your hike route while the phone is locked.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ]
     ]

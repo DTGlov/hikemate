@@ -19,6 +19,7 @@ type Props = {
   onStop: () => void;
   isGpsStale: boolean;
   permissionLost: boolean;
+  backgroundDisabled: boolean;
 };
 
 function liveDurationSeconds(
@@ -39,6 +40,7 @@ export function ActiveHikeOverlay({
   onStop,
   isGpsStale,
   permissionLost,
+  backgroundDisabled,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
   const status = useHikeTrackingStore((s) => s.status);
@@ -118,13 +120,15 @@ export function ActiveHikeOverlay({
             />
           </View>
 
-          {(isGpsStale || permissionLost) && (
+          {(isGpsStale || permissionLost || backgroundDisabled) && (
             <View className="mt-3 flex-row items-center justify-center gap-2 rounded-lg bg-amber-50 px-3 py-2">
               <Ionicons name="warning-outline" size={16} color="#b45309" />
               <Text className="text-sm text-amber-900">
                 {permissionLost
                   ? 'Location access lost — re-enable in Settings'
-                  : 'Searching for GPS…'}
+                  : backgroundDisabled
+                    ? 'Background tracking off — locking your phone will pause this hike'
+                    : 'Searching for GPS…'}
               </Text>
             </View>
           )}
