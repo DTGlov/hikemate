@@ -1,10 +1,13 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useEffect } from 'react';
 import { Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
 import { useAuthStore } from '@/stores/useAuthStore';
+
+const GRACE_PERIOD_MS = 10_000;
 
 type Props = {
   children: React.ReactNode;
@@ -15,6 +18,27 @@ export function BiometricGate({ children }: Props): React.JSX.Element {
   const isBiometricUnlocked = useAuthStore(
     (state) => state.isBiometricUnlocked,
   );
+  const lastUnlockedAt = useAuthStore((state) => state.lastUnlockedAt);
+  const setBiometricUnlocked = useAuthStore(
+    (state) => state.setBiometricUnlocked,
+  );
+
+  // Grace period: if the user unlocked recently and we're being asked to
+  // re-evaluate (e.g. AppState fired 'background' on a swipe-then-return),
+  // skip the prompt instead of forcing a fresh biometric. The JS context
+  // survived the brief absence, so we can trust the recent unlock.
+  // On a true cold start, lastUnlockedAt resets to null (in-memory state)
+  // so this branch can't fire — biometrics are still required.
+  useEffect(() => {
+    if (
+      session &&
+      !isBiometricUnlocked &&
+      lastUnlockedAt !== null &&
+      Date.now() - lastUnlockedAt < GRACE_PERIOD_MS
+    ) {
+      setBiometricUnlocked(true);
+    }
+  }, [session, isBiometricUnlocked, lastUnlockedAt, setBiometricUnlocked]);
 
   if (!session || isBiometricUnlocked) {
     return <>{children}</>;

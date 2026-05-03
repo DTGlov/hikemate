@@ -22,8 +22,14 @@ export default function RootLayout(): React.JSX.Element {
   }, [initialize]);
 
   useEffect(() => {
+    // Only lock when the app actually backgrounds. iOS fires 'inactive' for
+    // many transient interruptions where the user hasn't left the app —
+    // app switcher peek, Notification Center / Control Center swipe-down,
+    // incoming call banners, system permission dialogs. Treating those as
+    // a lock event causes the biometric prompt to fire mid-transition and
+    // immediately fail. 'background' is the real "user left the app" signal.
     const sub = AppState.addEventListener('change', (next) => {
-      if (next === 'background' || next === 'inactive') {
+      if (next === 'background') {
         setBiometricUnlocked(false);
       }
     });
