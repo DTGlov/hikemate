@@ -13,7 +13,7 @@ type Props = {
  * Two small floating buttons on the map for entering a group hike. Sit
  * just above the Start Hike button so the primary action stays primary.
  */
-export function RoomEntryFabs({ onCreate, onJoin }: Props): React.JSX.Element {
+export function CrewEntryFabs({ onCreate, onJoin }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
   return (
     <View
@@ -30,21 +30,21 @@ export function RoomEntryFabs({ onCreate, onJoin }: Props): React.JSX.Element {
     >
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Create a group hike room"
+        accessibilityLabel="Create a group hike crew"
         onPress={onCreate}
         className="h-11 flex-row items-center gap-1.5 rounded-full bg-white px-4 shadow-md active:bg-gray-100"
       >
         <Ionicons name="add-circle-outline" size={18} color="#0f766e" />
-        <Text className="text-sm font-semibold text-gray-900">Create Room</Text>
+        <Text className="text-sm font-semibold text-gray-900">Create Crew</Text>
       </Pressable>
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Join a group hike room"
+        accessibilityLabel="Join a group hike crew"
         onPress={onJoin}
         className="h-11 flex-row items-center gap-1.5 rounded-full bg-white px-4 shadow-md active:bg-gray-100"
       >
         <Ionicons name="enter-outline" size={18} color="#0f766e" />
-        <Text className="text-sm font-semibold text-gray-900">Join Room</Text>
+        <Text className="text-sm font-semibold text-gray-900">Join Crew</Text>
       </Pressable>
     </View>
   );

@@ -1,14 +1,14 @@
 import { LineLayer, ShapeSource } from '@rnmapbox/maps';
 import { useMemo } from 'react';
 
-import type { MemberLivePosition } from '@/types/room';
+import type { MemberLivePosition } from '@/types/crew';
 
 type Props = {
   position: MemberLivePosition;
   color: string;
 };
 
-export function RoomMemberPathLayer({
+export function CrewMemberPathLayer({
   position,
   color,
 }: Props): React.JSX.Element | null {
@@ -26,8 +26,8 @@ export function RoomMemberPathLayer({
 
   if (!shape) return null;
 
-  const sourceId = `room-path-source-${position.user_id}`;
-  const layerId = `room-path-line-${position.user_id}`;
+  const sourceId = `crew-path-source-${position.user_id}`;
+  const layerId = `crew-path-line-${position.user_id}`;
 
   return (
     <ShapeSource id={sourceId} shape={shape}>

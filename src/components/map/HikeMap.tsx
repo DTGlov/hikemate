@@ -13,19 +13,19 @@ import { HikePathLayer } from '@/components/hike/HikePathLayer';
 import { StartHikeButton } from '@/components/hike/StartHikeButton';
 import { StopHikeConfirmModal } from '@/components/hike/StopHikeConfirmModal';
 import { RecenterButton } from '@/components/map/RecenterButton';
-import { CreateRoomSheet } from '@/components/room/CreateRoomSheet';
-import { JoinRoomSheet } from '@/components/room/JoinRoomSheet';
-import { MemberDetailCard } from '@/components/room/MemberDetailCard';
-import { RoomEntryFabs } from '@/components/room/RoomEntryFabs';
-import { RoomMemberDot } from '@/components/room/RoomMemberDot';
-import { RoomMemberPathLayer } from '@/components/room/RoomMemberPathLayer';
-import { RoomMembersBottomSheet } from '@/components/room/RoomMembersBottomSheet';
+import { CreateCrewSheet } from '@/components/crew/CreateCrewSheet';
+import { JoinCrewSheet } from '@/components/crew/JoinCrewSheet';
+import { MemberDetailCard } from '@/components/crew/MemberDetailCard';
+import { CrewEntryFabs } from '@/components/crew/CrewEntryFabs';
+import { CrewMemberDot } from '@/components/crew/CrewMemberDot';
+import { CrewMemberPathLayer } from '@/components/crew/CrewMemberPathLayer';
+import { CrewMembersBottomSheet } from '@/components/crew/CrewMembersBottomSheet';
 import { useAlwaysPermission } from '@/hooks/useAlwaysPermission';
 import { useBackgroundHikeTracker } from '@/hooks/useBackgroundHikeTracker';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
-import { useRoomStore } from '@/stores/useRoomStore';
+import { useCrewStore } from '@/stores/useCrewStore';
 
 const DEFAULT_ZOOM = 15;
 
@@ -53,18 +53,18 @@ export function HikeMap(): React.JSX.Element {
   const startHike = useHikeTrackingStore((s) => s.startHike);
   const isHikeActive = hikeStatus === 'tracking' || hikeStatus === 'paused';
 
-  const room = useRoomStore((s) => s.room);
-  const members = useRoomStore((s) => s.members);
-  const livePositions = useRoomStore((s) => s.livePositions);
-  const myUserId = useRoomStore((s) => s.myUserId);
-  const inRoom = room !== null;
+  const crew = useCrewStore((s) => s.crew);
+  const members = useCrewStore((s) => s.members);
+  const livePositions = useCrewStore((s) => s.livePositions);
+  const myUserId = useCrewStore((s) => s.myUserId);
+  const inCrew = crew !== null;
 
   const cameraRef = useRef<Camera>(null);
   const [stopModalVisible, setStopModalVisible] = useState(false);
   const [explainerVisible, setExplainerVisible] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
-  const [createRoomVisible, setCreateRoomVisible] = useState(false);
-  const [joinRoomVisible, setJoinRoomVisible] = useState(false);
+  const [createCrewVisible, setCreateCrewVisible] = useState(false);
+  const [joinCrewVisible, setJoinCrewVisible] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -186,15 +186,15 @@ export function HikeMap(): React.JSX.Element {
         <UserLocation visible androidRenderMode="gps" />
         {isHikeActive ? <HikePathLayer points={trackingPoints} /> : null}
 
-        {/* Room overlays — paths under dots so dots stay on top. */}
-        {inRoom
+        {/* Crew overlays — paths under dots so dots stay on top. */}
+        {inCrew
           ? Object.values(livePositions)
               .filter((p) => p.user_id !== myUserId)
               .map((position) => {
                 const member = members[position.user_id];
                 if (!member) return null;
                 return (
-                  <RoomMemberPathLayer
+                  <CrewMemberPathLayer
                     key={`path-${position.user_id}`}
                     position={position}
                     color={member.color}
@@ -202,14 +202,14 @@ export function HikeMap(): React.JSX.Element {
                 );
               })
           : null}
-        {inRoom
+        {inCrew
           ? Object.values(livePositions)
               .filter((p) => p.user_id !== myUserId)
               .map((position) => {
                 const member = members[position.user_id];
                 if (!member) return null;
                 return (
-                  <RoomMemberDot
+                  <CrewMemberDot
                     key={`dot-${position.user_id}`}
                     member={member}
                     position={position}
@@ -241,12 +241,12 @@ export function HikeMap(): React.JSX.Element {
       ) : (
         <>
           <RecenterButton cameraRef={cameraRef} />
-          {!inRoom ? (
+          {!inCrew ? (
             <>
               <StartHikeButton onPress={() => void onStartHike()} />
-              <RoomEntryFabs
-                onCreate={() => setCreateRoomVisible(true)}
-                onJoin={() => setJoinRoomVisible(true)}
+              <CrewEntryFabs
+                onCreate={() => setCreateCrewVisible(true)}
+                onJoin={() => setJoinCrewVisible(true)}
               />
             </>
           ) : null}
@@ -267,19 +267,19 @@ export function HikeMap(): React.JSX.Element {
         />
       ) : null}
 
-      {inRoom ? <RoomMembersBottomSheet /> : null}
+      {inCrew ? <CrewMembersBottomSheet /> : null}
 
       <StopHikeConfirmModal
         visible={stopModalVisible}
         onClose={() => setStopModalVisible(false)}
       />
-      <CreateRoomSheet
-        visible={createRoomVisible}
-        onClose={() => setCreateRoomVisible(false)}
+      <CreateCrewSheet
+        visible={createCrewVisible}
+        onClose={() => setCreateCrewVisible(false)}
       />
-      <JoinRoomSheet
-        visible={joinRoomVisible}
-        onClose={() => setJoinRoomVisible(false)}
+      <JoinCrewSheet
+        visible={joinCrewVisible}
+        onClose={() => setJoinCrewVisible(false)}
       />
     </View>
   );
