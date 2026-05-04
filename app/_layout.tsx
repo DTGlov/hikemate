@@ -14,10 +14,14 @@ import { BackgroundTrackingBanner } from '@/components/hike/BackgroundTrackingBa
 import { useHikeLifecycle } from '@/hooks/useHikeLifecycle';
 import { clearInProgressHike } from '@/lib/hikePersistence';
 import { ActiveCrewBanner } from '@/components/crew/ActiveCrewBanner';
+import { OutboxBanner } from '@/components/offline/OutboxBanner';
 import { useCrew, joinCrew, leaveCrew } from '@/hooks/useCrew';
 import { useCrewBroadcast } from '@/hooks/useCrewBroadcast';
 import { useCrewStatsBroadcast } from '@/hooks/useCrewStatsBroadcast';
+import { useHikeOutboxSync } from '@/hooks/useHikeOutboxSync';
 import { useMeetingPointGeofence } from '@/hooks/useMeetingPointGeofence';
+import { useOnlineState } from '@/hooks/useOnlineState';
+import { clearOutbox } from '@/lib/hikeOutbox';
 import {
   clearActiveCrewId,
   clearPendingCrewCode,
@@ -120,6 +124,8 @@ export default function RootLayout(): React.JSX.Element {
   useCrewBroadcast();
   useCrewStatsBroadcast();
   useMeetingPointGeofence();
+  useOnlineState();
+  useHikeOutboxSync();
 
   const restoredRef = useRef(false);
 
@@ -133,6 +139,7 @@ export default function RootLayout(): React.JSX.Element {
       resetProfile();
       useHikeTrackingStore.getState().resetHike();
       void clearInProgressHike();
+      void clearOutbox();
       void leaveCrew();
       void clearActiveCrewId();
       restoredRef.current = false;
@@ -293,6 +300,7 @@ export default function RootLayout(): React.JSX.Element {
             />
           </Stack>
           <BackgroundTrackingBanner />
+          <OutboxBanner />
           <ActiveCrewBanner />
         </View>
       </BottomSheetModalProvider>

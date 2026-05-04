@@ -13,10 +13,18 @@ import {
 } from 'react-native';
 
 import { Button } from '@/components/Button';
+import {
+  enqueue as enqueueOutbox,
+  getOutbox,
+  uuidV4,
+  type OutboxedHikePayload,
+} from '@/lib/hikeOutbox';
+import { fetchOnlineState } from '@/lib/netinfo';
 import { supabase } from '@/lib/supabase';
 import { formatDistance, formatDuration, formatElevation } from '@/lib/units';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
+import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useProfileStore } from '@/stores/useProfileStore';
 
 const SHORT_HIKE_THRESHOLD_M = 50;
@@ -65,34 +73,54 @@ export function StopHikeConfirmModal({
     const finalName =
       name.trim() || `Hike on ${format(draft.startedAtMs, 'PP')}`;
 
-    const { data, error: insertError } = await supabase
-      .from('hikes')
-      .insert({
-        user_id: userId,
-        name: finalName,
-        started_at: startedAtIso,
-        ended_at: endedAtIso,
-        duration_seconds: draft.durationSeconds,
-        distance_meters: draft.distanceMeters,
-        elevation_gain_meters: draft.elevationGainMeters,
-        elevation_loss_meters: draft.elevationLossMeters,
-        path: draft.path,
-        bounding_box: draft.bounding_box,
-      })
-      .select('id')
-      .single();
+    // Generate the row id locally so the outbox identity equals the
+    // server row identity if we have to fall back to offline save.
+    const payload: OutboxedHikePayload = {
+      id: uuidV4(),
+      user_id: userId,
+      name: finalName,
+      started_at: startedAtIso,
+      ended_at: endedAtIso,
+      duration_seconds: draft.durationSeconds,
+      distance_meters: draft.distanceMeters,
+      elevation_gain_meters: draft.elevationGainMeters,
+      elevation_loss_meters: draft.elevationLossMeters,
+      path: draft.path,
+      bounding_box: draft.bounding_box,
+    };
+
+    const queueAndExit = async (reason: string): Promise<void> => {
+      await enqueueOutbox(payload);
+      const items = await getOutbox();
+      useOfflineStore.getState().setOutboxCount(items.length);
+      setIsSaving(false);
+      resetHike();
+      onClose();
+      console.log('[outbox] queued hike for sync:', reason);
+      router.replace('/(tabs)/hikes');
+    };
+
+    const online = await fetchOnlineState();
+    if (!online) {
+      await queueAndExit('offline');
+      return;
+    }
+
+    const { error: insertError } = await supabase.from('hikes').insert(payload);
 
     if (insertError) {
-      setIsSaving(false);
-      setError(insertError.message);
-      // Drop back to paused so the user can retry.
+      // Network round-tripped but the DB rejected. Could be transient
+      // (rate-limit, RLS race) — queue rather than lose the data. The
+      // user can retry from the outbox banner if it's a permanent
+      // failure surfaced by attemptCount climbing.
+      await queueAndExit(`insert error: ${insertError.message}`);
       return;
     }
 
     setIsSaving(false);
     resetHike();
     onClose();
-    router.replace(`/hike/${data.id}`);
+    router.replace(`/hike/${payload.id}`);
   };
 
   const handleDiscard = (): void => {

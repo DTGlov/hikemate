@@ -5,13 +5,19 @@ import { Animated, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useCrewStore } from '@/stores/useCrewStore';
+import { useOfflineStore } from '@/stores/useOfflineStore';
+
+const BANNER_SLOT_HEIGHT = 56;
 
 export function ActiveCrewBanner(): React.JSX.Element | null {
   const crew = useCrewStore((s) => s.crew);
   const memberCount = useCrewStore((s) => Object.keys(s.members).length);
+  const outboxCount = useOfflineStore((s) => s.outboxCount);
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const segments = useSegments();
+  // Slot below OutboxBanner if it's currently visible.
+  const slotOffset = outboxCount > 0 ? BANNER_SLOT_HEIGHT : 0;
 
   const pulse = useRef(new Animated.Value(0)).current;
 
@@ -51,7 +57,7 @@ export function ActiveCrewBanner(): React.JSX.Element | null {
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        top: insets.top,
+        top: insets.top + slotOffset,
         left: 0,
         right: 0,
         zIndex: 50,

@@ -16,6 +16,7 @@
     "@gorhom/bottom-sheet": "^5.2.13",
     "@hookform/resolvers": "^5.2.2",
     "@mapbox/polyline": "^1.2.1",
+    "@react-native-community/netinfo": "11.4.1",
     "@rnmapbox/maps": "^10.3.0",
     "@supabase/supabase-js": "^2.105.1",
     "date-fns": "^4.1.0",

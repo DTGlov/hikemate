@@ -5,8 +5,12 @@ import { Animated, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { formatDistance, formatDuration } from '@/lib/units';
+import { useCrewStore } from '@/stores/useCrewStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
+import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useProfileStore } from '@/stores/useProfileStore';
+
+const BANNER_SLOT_HEIGHT = 56;
 
 export function BackgroundTrackingBanner(): React.JSX.Element | null {
   const status = useHikeTrackingStore((s) => s.status);
@@ -17,6 +21,8 @@ export function BackgroundTrackingBanner(): React.JSX.Element | null {
     (s) => s.accumulatedPausedMs,
   );
   const unitSystem = useProfileStore((s) => s.profile?.unit_system ?? 'metric');
+  const outboxCount = useOfflineStore((s) => s.outboxCount);
+  const inCrew = useCrewStore((s) => s.crew !== null);
 
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -67,12 +73,22 @@ export function BackgroundTrackingBanner(): React.JSX.Element | null {
     );
   })();
 
+  // Slot below any banner that's also visible on this screen. Outbox
+  // is global; ActiveCrewBanner only appears on non-Home tabs (same
+  // hide rule as us, but inverted) — but ActiveCrewBanner already
+  // hides on Home, and we ALSO hide on Home, so there's never a
+  // case where both appear simultaneously. We only need to leave room
+  // for outbox.
+  const slotOffset = outboxCount > 0 ? BANNER_SLOT_HEIGHT : 0;
+  // (inCrew read kept so a future banner can stack here too.)
+  void inCrew;
+
   return (
     <View
       pointerEvents="box-none"
       style={{
         position: 'absolute',
-        top: insets.top,
+        top: insets.top + slotOffset,
         left: 0,
         right: 0,
         zIndex: 50,
