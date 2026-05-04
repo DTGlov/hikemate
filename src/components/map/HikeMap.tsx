@@ -1,3 +1,4 @@
+import { Ionicons } from '@expo/vector-icons';
 import Mapbox, {
   Camera,
   MapView,
@@ -5,7 +6,14 @@ import Mapbox, {
   type MapState,
 } from '@rnmapbox/maps';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Text, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Linking,
+  Pressable,
+  Text,
+  View,
+} from 'react-native';
 
 import { ActiveHikeOverlay } from '@/components/hike/ActiveHikeOverlay';
 import { AlwaysPermissionExplainer } from '@/components/hike/AlwaysPermissionExplainer';
@@ -14,18 +22,22 @@ import { StartHikeButton } from '@/components/hike/StartHikeButton';
 import { StopHikeConfirmModal } from '@/components/hike/StopHikeConfirmModal';
 import { RecenterButton } from '@/components/map/RecenterButton';
 import { CreateCrewSheet } from '@/components/crew/CreateCrewSheet';
-import { JoinCrewSheet } from '@/components/crew/JoinCrewSheet';
-import { MemberDetailCard } from '@/components/crew/MemberDetailCard';
 import { CrewEntryFabs } from '@/components/crew/CrewEntryFabs';
 import { CrewMemberDot } from '@/components/crew/CrewMemberDot';
 import { CrewMemberPathLayer } from '@/components/crew/CrewMemberPathLayer';
 import { CrewMembersBottomSheet } from '@/components/crew/CrewMembersBottomSheet';
+import { DropMeetingPointButton } from '@/components/crew/DropMeetingPointButton';
+import { DropMeetingPointHint } from '@/components/crew/DropMeetingPointHint';
+import { JoinCrewSheet } from '@/components/crew/JoinCrewSheet';
+import { MeetingPointGeofenceLayer } from '@/components/crew/MeetingPointGeofenceLayer';
+import { MeetingPointPin } from '@/components/crew/MeetingPointPin';
+import { MemberDetailCard } from '@/components/crew/MemberDetailCard';
 import { useAlwaysPermission } from '@/hooks/useAlwaysPermission';
 import { useBackgroundHikeTracker } from '@/hooks/useBackgroundHikeTracker';
 import { useUserLocation } from '@/hooks/useUserLocation';
+import { useCrewStore } from '@/stores/useCrewStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
-import { useCrewStore } from '@/stores/useCrewStore';
 
 const DEFAULT_ZOOM = 15;
 
@@ -56,7 +68,11 @@ export function HikeMap(): React.JSX.Element {
   const crew = useCrewStore((s) => s.crew);
   const members = useCrewStore((s) => s.members);
   const livePositions = useCrewStore((s) => s.livePositions);
+  const meetingPoint = useCrewStore((s) => s.meetingPoint);
+  const arrivals = useCrewStore((s) => s.arrivals);
   const myUserId = useCrewStore((s) => s.myUserId);
+  const isHost = useCrewStore((s) => s.isHost);
+  const setMeetingPointRemote = useCrewStore((s) => s.setMeetingPointRemote);
   const inCrew = crew !== null;
 
   const cameraRef = useRef<Camera>(null);
@@ -66,6 +82,7 @@ export function HikeMap(): React.JSX.Element {
   const [createCrewVisible, setCreateCrewVisible] = useState(false);
   const [joinCrewVisible, setJoinCrewVisible] = useState(false);
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [dropPinMode, setDropPinMode] = useState(false);
 
   useEffect(() => {
     void loadLastKnownLocation();
@@ -86,6 +103,33 @@ export function HikeMap(): React.JSX.Element {
       }
     },
     [isFollowingUser, setFollowingUser],
+  );
+
+  // Map tap handler: only acts when in drop-pin mode (host-only).
+  // GeoJSON Point coordinates are [lng, lat].
+  const onMapPress = useCallback(
+    (feature: GeoJSON.Feature<GeoJSON.Point>): void => {
+      if (!dropPinMode || !crew || !isHost) return;
+      const [lng, lat] = feature.geometry.coordinates;
+      Alert.alert(
+        meetingPoint ? 'Move meeting point here?' : 'Drop meeting point here?',
+        'Crew members will see the new location and a 100m geofence around it.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          {
+            text: 'Confirm',
+            onPress: async () => {
+              const { error } = await setMeetingPointRemote(lat, lng);
+              setDropPinMode(false);
+              if (error) {
+                Alert.alert('Could not set meeting point', error);
+              }
+            },
+          },
+        ],
+      );
+    },
+    [crew, dropPinMode, isHost, meetingPoint, setMeetingPointRemote],
   );
 
   const beginHike = useCallback((): void => {
@@ -170,6 +214,7 @@ export function HikeMap(): React.JSX.Element {
         style={{ flex: 1 }}
         styleURL={Mapbox.StyleURL.Outdoors}
         onCameraChanged={onCameraChanged}
+        onPress={onMapPress}
         scaleBarEnabled={false}
         compassEnabled
       >
@@ -185,6 +230,25 @@ export function HikeMap(): React.JSX.Element {
         />
         <UserLocation visible androidRenderMode="gps" />
         {isHikeActive ? <HikePathLayer points={trackingPoints} /> : null}
+
+        {/* Phase 7 — meeting point geofence + pin. Geofence first so the
+            pin renders on top. Visible to every crew member. */}
+        {inCrew && meetingPoint ? (
+          <>
+            <MeetingPointGeofenceLayer point={meetingPoint} />
+            <MeetingPointPin
+              point={meetingPoint}
+              onSelected={() => {
+                const totalMembers = Object.keys(members).length;
+                const arrivedCount = Object.keys(arrivals).length;
+                Alert.alert(
+                  meetingPoint.label,
+                  `${arrivedCount} of ${totalMembers} arrived`,
+                );
+              }}
+            />
+          </>
+        ) : null}
 
         {/* Crew overlays — paths under dots so dots stay on top. */}
         {inCrew
@@ -250,8 +314,32 @@ export function HikeMap(): React.JSX.Element {
               />
             </>
           ) : null}
+          {/* Phase 7 — host-only meeting point control. Hidden during
+              drop-pin mode (the hint banner takes its place) and during
+              active hikes (the overlay's own controls take over). */}
+          {inCrew && isHost && !dropPinMode ? (
+            <DropMeetingPointButton
+              hasExistingPin={meetingPoint !== null}
+              onPress={() => setDropPinMode(true)}
+            />
+          ) : null}
         </>
       )}
+
+      {/* Drop-pin top banner — host-only, only while in drop mode. */}
+      {dropPinMode ? (
+        <DropMeetingPointHint onCancel={() => setDropPinMode(false)} />
+      ) : null}
+
+      {/* Non-host members with a meeting point but without Always
+          permission — surface a dismissable banner so they know
+          notifications won't fire. Host already knows. */}
+      {inCrew &&
+      !isHost &&
+      meetingPoint !== null &&
+      alwaysStatus !== 'always' ? (
+        <AlwaysPermissionBanner />
+      ) : null}
 
       <AlwaysPermissionExplainer
         visible={explainerVisible}
@@ -282,5 +370,43 @@ export function HikeMap(): React.JSX.Element {
         onClose={() => setJoinCrewVisible(false)}
       />
     </View>
+  );
+}
+
+/**
+ * Surfaced when a meeting point exists but the user is on foreground-only
+ * permission, so the geofence can't register and arrival notifications
+ * won't fire. Tappable → opens system Settings.
+ */
+function AlwaysPermissionBanner(): React.JSX.Element {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Open settings to enable Always location"
+      onPress={() => void Linking.openSettings()}
+      style={{
+        position: 'absolute',
+        top: 64,
+        left: 12,
+        right: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        paddingHorizontal: 14,
+        paddingVertical: 10,
+        borderRadius: 12,
+        backgroundColor: '#fef3c7',
+        borderWidth: 1,
+        borderColor: '#fde68a',
+      }}
+    >
+      <Ionicons name="warning-outline" size={18} color="#b45309" />
+      <Text style={{ flex: 1, fontSize: 13, color: '#78350f' }}>
+        Always location needed for arrival notifications.
+      </Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: '#0f766e' }}>
+        Open Settings
+      </Text>
+    </Pressable>
   );
 }

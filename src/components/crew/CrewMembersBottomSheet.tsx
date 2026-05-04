@@ -5,6 +5,8 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 
+import { Ionicons } from '@expo/vector-icons';
+
 import { endCrewAsHost, leaveCrew } from '@/hooks/useCrew';
 import { initialsFromDisplayName } from '@/lib/displayName';
 import { formatDistance, formatDuration, formatPace } from '@/lib/units';
@@ -46,6 +48,7 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
   const members = useCrewStore((s) => s.members);
   const livePositions = useCrewStore((s) => s.livePositions);
   const liveStats = useCrewStore((s) => s.liveStats);
+  const arrivals = useCrewStore((s) => s.arrivals);
   const myUserId = useCrewStore((s) => s.myUserId);
   const isHost = useCrewStore((s) => s.isHost);
   const unitSystem = useProfileStore((s) => s.profile?.unit_system ?? 'metric');
@@ -137,6 +140,7 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
             key={row.member.user_id}
             row={row}
             isHost={crew.host_id === row.member.user_id}
+            arrived={Boolean(arrivals[row.member.user_id])}
             unitSystem={unitSystem}
           />
         ))}
@@ -257,10 +261,12 @@ function CrewHeader({ code }: { code: string }): React.JSX.Element {
 function MemberRow({
   row,
   isHost: isHostRow,
+  arrived,
   unitSystem,
 }: {
   row: Row;
   isHost: boolean;
+  arrived: boolean;
   unitSystem: 'metric' | 'imperial';
 }): React.JSX.Element {
   const { member, position, stats, isMe } = row;
@@ -311,6 +317,14 @@ function MemberRow({
             {isMe ? ' (you)' : ''}
           </Text>
           {isHostRow ? <Text style={{ fontSize: 14 }}>⭐</Text> : null}
+          {arrived ? (
+            <View
+              accessibilityRole="text"
+              accessibilityLabel="Arrived at meeting point"
+            >
+              <Ionicons name="checkmark-circle" size={16} color="#16a34a" />
+            </View>
+          ) : null}
         </View>
         <Text
           numberOfLines={1}

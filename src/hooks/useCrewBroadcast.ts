@@ -4,8 +4,9 @@ import { haversineMeters } from '@/lib/geo';
 import { broadcastPosition } from '@/lib/realtimeChannels';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useLocationStore } from '@/stores/useLocationStore';
 import { useCrewStore } from '@/stores/useCrewStore';
+import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
+import { useLocationStore } from '@/stores/useLocationStore';
 
 const BROADCAST_INTERVAL_MS = 5_000;
 const DB_WRITE_INTERVAL_MS = 60_000;
@@ -24,11 +25,14 @@ export function useCrewBroadcast(): void {
   const crew = useCrewStore((s) => s.crew);
   const myUserId = useAuthStore((s) => s.user?.id ?? null);
   const currentLocation = useLocationStore((s) => s.currentLocation);
+  const hikeStatus = useHikeTrackingStore((s) => s.status);
+  const isActiveHike = hikeStatus === 'tracking' || hikeStatus === 'paused';
 
   console.log('[RT-MOUNT] useCrewBroadcast mounted', {
     hasChannel: !!channel,
     channelState: channel?.state,
     hasCurrentLocation: !!currentLocation,
+    isActiveHike,
     myUserId: useAuthStore.getState().user?.id,
   });
 
@@ -45,7 +49,16 @@ export function useCrewBroadcast(): void {
   }, [crew?.id, myUserId]);
 
   useEffect(() => {
-    if (!channel || !crew || !myUserId || !currentLocation) return;
+    // Phase 7 commute refinement — we don't broadcast position during
+    // commute. In West African hiking culture crews often travel together
+    // by bus or shared taxi to the trailhead, so dotting everyone on the
+    // map en-route is wasteful. Position broadcasts (and the matching DB
+    // last_known_* writes for late joiners) resume the moment any member
+    // taps Start Hike. Arrival at the meeting point is communicated via
+    // the geofence ✓ instead.
+    if (!channel || !crew || !myUserId || !currentLocation || !isActiveHike) {
+      return;
+    }
 
     const now = Date.now();
 
@@ -108,5 +121,5 @@ export function useCrewBroadcast(): void {
         .eq('room_id', crew.id)
         .eq('user_id', myUserId);
     }
-  }, [channel, crew, myUserId, currentLocation]);
+  }, [channel, crew, myUserId, currentLocation, isActiveHike]);
 }

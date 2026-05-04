@@ -5,9 +5,10 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-// Side-effect import: registers the TaskManager task at module load so the
-// OS can wake JS for background location events even on cold launches.
+// Side-effect imports: register TaskManager tasks at module load so the
+// OS can wake JS for background events even on cold launches.
 import '@/lib/backgroundLocationTask';
+import '@/lib/meetingPointTask';
 
 import { BackgroundTrackingBanner } from '@/components/hike/BackgroundTrackingBanner';
 import { useHikeLifecycle } from '@/hooks/useHikeLifecycle';
@@ -16,6 +17,7 @@ import { ActiveCrewBanner } from '@/components/crew/ActiveCrewBanner';
 import { useCrew, joinCrew, leaveCrew } from '@/hooks/useCrew';
 import { useCrewBroadcast } from '@/hooks/useCrewBroadcast';
 import { useCrewStatsBroadcast } from '@/hooks/useCrewStatsBroadcast';
+import { useMeetingPointGeofence } from '@/hooks/useMeetingPointGeofence';
 import {
   clearActiveCrewId,
   clearPendingCrewCode,
@@ -117,6 +119,7 @@ export default function RootLayout(): React.JSX.Element {
   useCrew();
   useCrewBroadcast();
   useCrewStatsBroadcast();
+  useMeetingPointGeofence();
 
   const restoredRef = useRef(false);
 

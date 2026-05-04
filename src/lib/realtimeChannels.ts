@@ -5,8 +5,10 @@ import type {
   CrewMember,
   CrewStatsBroadcast,
   HikeCrew,
+  MeetingPoint,
   MemberPositionBroadcast,
 } from '@/types/crew';
+import { extractMeetingPoint } from '@/types/crew';
 
 const POSITION_BROADCAST_EVENT = 'position';
 const CREW_STATS_BROADCAST_EVENT = 'crew-stats';
@@ -16,6 +18,8 @@ export type CrewChannelCallbacks = {
   onMemberLeft: (userId: string) => void;
   onMemberUpdated: (member: CrewMember) => void;
   onCrewEnded: () => void;
+  onMeetingPointChanged: (point: MeetingPoint | null) => void;
+  onArrival: (userId: string, arrivedAt: string) => void;
   onPositionBroadcast: (broadcast: MemberPositionBroadcast) => void;
   onCrewStatsBroadcast: (broadcast: CrewStatsBroadcast) => void;
   onPresenceSync: (onlineUserIds: string[]) => void;
@@ -91,7 +95,22 @@ export function subscribeToCrew(
         filter: `id=eq.${crewId}`,
       },
       (payload) => {
-        if ((payload.new as HikeCrew).ended_at) callbacks.onCrewEnded();
+        const next = payload.new as HikeCrew;
+        if (next.ended_at) callbacks.onCrewEnded();
+        callbacks.onMeetingPointChanged(extractMeetingPoint(next));
+      },
+    )
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'meeting_point_arrivals',
+        filter: `room_id=eq.${crewId}`,
+      },
+      (payload) => {
+        const row = payload.new as { user_id: string; arrived_at: string };
+        callbacks.onArrival(row.user_id, row.arrived_at);
       },
     )
     .on('broadcast', { event: POSITION_BROADCAST_EVENT }, (payload) => {
