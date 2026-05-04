@@ -15,7 +15,11 @@ type AuthState = {
   // a successful unlock — so transient backgrounding doesn't force re-auth.
   lastUnlockedAt: number | null;
   initialize: () => Promise<void>;
-  signUp: (email: string, password: string) => Promise<AuthResult>;
+  signUp: (
+    email: string,
+    password: string,
+    metadata?: Record<string, unknown>,
+  ) => Promise<AuthResult>;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   signOut: () => Promise<AuthResult>;
   setBiometricUnlocked: (value: boolean) => void;
@@ -50,8 +54,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
   },
 
-  signUp: async (email, password): Promise<AuthResult> => {
-    const { error } = await supabase.auth.signUp({ email, password });
+  signUp: async (email, password, metadata): Promise<AuthResult> => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: metadata ? { data: metadata } : undefined,
+    });
     return { error };
   },
 

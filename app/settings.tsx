@@ -23,12 +23,26 @@ export default function SettingsScreen(): React.JSX.Element {
   const [nameError, setNameError] = useState<string | null>(null);
   const [isSigningOut, setIsSigningOut] = useState(false);
 
+  const validateDisplayName = (value: string): string | null => {
+    const trimmed = value.trim();
+    if (trimmed.length < 2) return 'Too short — at least 2 characters';
+    if (trimmed.length > 30) return 'Too long — keep it under 30 characters';
+    if (trimmed.includes('@')) return 'Display name cannot contain @';
+    return null;
+  };
+
   const onSaveName = async (): Promise<void> => {
     if (!profile) return;
-    if (name.trim() === (profile.display_name ?? '').trim()) return;
+    const trimmed = name.trim();
+    if (trimmed === (profile.display_name ?? '').trim()) return;
+    const localError = validateDisplayName(name);
+    if (localError) {
+      setNameError(localError);
+      return;
+    }
     setIsSavingName(true);
     setNameError(null);
-    const { error } = await updateDisplayName(name);
+    const { error } = await updateDisplayName(trimmed);
     setIsSavingName(false);
     if (error) setNameError(error);
   };
@@ -61,10 +75,15 @@ export default function SettingsScreen(): React.JSX.Element {
           </View>
           <TextInput
             value={name}
-            onChangeText={setName}
+            onChangeText={(next) => {
+              setName(next);
+              if (nameError) setNameError(null);
+            }}
             onBlur={() => void onSaveName()}
             placeholder="Add a name"
             placeholderTextColor="#9ca3af"
+            autoCapitalize="words"
+            maxLength={30}
             className="h-12 rounded-xl border border-gray-200 bg-white px-3.5 text-base text-gray-900"
           />
           {nameError ? (
