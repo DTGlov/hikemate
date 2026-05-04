@@ -1,49 +1,50 @@
 import { useEffect, useState } from 'react';
 
-import { clearActiveRoomId } from '@/lib/activeRoomPersistence';
-import { subscribeToRoom, teardownChannel } from '@/lib/realtimeChannels';
-import { generateRoomCode } from '@/lib/roomCode';
+import { clearActiveCrewId } from '@/lib/activeCrewPersistence';
+import { subscribeToCrew, teardownChannel } from '@/lib/realtimeChannels';
+import { generateCrewCode } from '@/lib/crewCode';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useRoomStore } from '@/stores/useRoomStore';
-import type { HikeRoom, RoomMember } from '@/types/room';
+import { useCrewStore } from '@/stores/useCrewStore';
+import type { HikeCrew, CrewMember } from '@/types/crew';
 
-type UseRoomResult = {
+type UseCrewResult = {
   isLoading: boolean;
   error: string | null;
   endedReason: 'host-ended' | null;
 };
 
 /**
- * Mounts the channel for the currently-joined room. Reads the active
- * room id from useRoomStore — meant to be called by the root layout (or
- * a screen that owns the room session). Cleans up on unmount.
+ * Mounts the channel for the currently-joined crew. Reads the active
+ * crew id from useCrewStore — meant to be called by the root layout (or
+ * a screen that owns the crew session). Cleans up on unmount.
  *
- * The store is hydrated separately (via joinRoom / restoreActiveRoom).
- * This hook just wires the realtime channel onto whatever room is in the
- * store and tears it down on store.clearRoom().
+ * The store is hydrated separately (via joinCrew / restoreActiveCrew).
+ * This hook just wires the realtime channel onto whatever crew is in the
+ * store and tears it down on store.clearCrew().
  */
-export function useRoom(): UseRoomResult {
-  const room = useRoomStore((s) => s.room);
+export function useCrew(): UseCrewResult {
+  const crew = useCrewStore((s) => s.crew);
   const myUserId = useAuthStore((s) => s.user?.id ?? null);
-  const upsertMember = useRoomStore((s) => s.upsertMember);
-  const removeMember = useRoomStore((s) => s.removeMember);
-  const updateMemberPosition = useRoomStore((s) => s.updateMemberPosition);
-  const setOnlineUserIds = useRoomStore((s) => s.setOnlineUserIds);
-  const setChannel = useRoomStore((s) => s.setChannel);
-  const clearChannel = useRoomStore((s) => s.clearChannel);
-  const clearRoom = useRoomStore((s) => s.clearRoom);
+  const upsertMember = useCrewStore((s) => s.upsertMember);
+  const removeMember = useCrewStore((s) => s.removeMember);
+  const updateMemberPosition = useCrewStore((s) => s.updateMemberPosition);
+  const updateMemberStats = useCrewStore((s) => s.updateMemberStats);
+  const setOnlineUserIds = useCrewStore((s) => s.setOnlineUserIds);
+  const setChannel = useCrewStore((s) => s.setChannel);
+  const clearChannel = useCrewStore((s) => s.clearChannel);
+  const clearCrew = useCrewStore((s) => s.clearCrew);
 
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [endedReason, setEndedReason] =
-    useState<UseRoomResult['endedReason']>(null);
+    useState<UseCrewResult['endedReason']>(null);
 
   useEffect(() => {
     setEndedReason(null);
-    if (!room || !myUserId) {
-      // Tear down any leftover channel from a prior room session.
-      const existing = useRoomStore.getState().channel;
+    if (!crew || !myUserId) {
+      // Tear down any leftover channel from a prior crew session.
+      const existing = useCrewStore.getState().channel;
       if (existing) {
         clearChannel();
         void teardownChannel(existing);
@@ -55,8 +56,8 @@ export function useRoom(): UseRoomResult {
     setIsLoading(true);
     setError(null);
 
-    const channel = subscribeToRoom(room.id, myUserId, {
-      onMemberJoined: (member: RoomMember) => {
+    const channel = subscribeToCrew(crew.id, myUserId, {
+      onMemberJoined: (member: CrewMember) => {
         if (cancelled) return;
         upsertMember(member);
       },
@@ -64,19 +65,23 @@ export function useRoom(): UseRoomResult {
         if (cancelled) return;
         removeMember(userId);
       },
-      onMemberUpdated: (member: RoomMember) => {
+      onMemberUpdated: (member: CrewMember) => {
         if (cancelled) return;
         upsertMember(member);
       },
-      onRoomEnded: () => {
+      onCrewEnded: () => {
         if (cancelled) return;
         setEndedReason('host-ended');
-        void clearActiveRoomId();
-        clearRoom();
+        void clearActiveCrewId();
+        clearCrew();
       },
       onPositionBroadcast: (broadcast) => {
         if (cancelled) return;
         updateMemberPosition(broadcast);
+      },
+      onCrewStatsBroadcast: (broadcast) => {
+        if (cancelled) return;
+        updateMemberStats(broadcast);
       },
       onPresenceSync: (onlineUserIds) => {
         if (cancelled) return;
@@ -92,38 +97,39 @@ export function useRoom(): UseRoomResult {
 
     return (): void => {
       cancelled = true;
-      const captured = useRoomStore.getState().channel;
+      const captured = useCrewStore.getState().channel;
       clearChannel();
       if (captured) void teardownChannel(captured);
     };
   }, [
-    room?.id,
+    crew?.id,
     myUserId,
     upsertMember,
     removeMember,
     updateMemberPosition,
+    updateMemberStats,
     setOnlineUserIds,
     setChannel,
     clearChannel,
-    clearRoom,
-    room,
+    clearCrew,
+    crew,
   ]);
 
-  // Re-poll the room row periodically to detect 24-hour expiry. The host
-  // ending the room is delivered via UPDATE realtime; expiry just rolls
+  // Re-poll the crew row periodically to detect 24-hour expiry. The host
+  // ending the crew is delivered via UPDATE realtime; expiry just rolls
   // over the timestamp without anyone updating ended_at, so we check.
   useEffect(() => {
-    if (!room) return;
+    if (!crew) return;
     const id = setInterval(() => {
-      const expiresAt = new Date(room.expires_at).getTime();
+      const expiresAt = new Date(crew.expires_at).getTime();
       if (Date.now() >= expiresAt) {
         setEndedReason('host-ended');
-        void clearActiveRoomId();
-        clearRoom();
+        void clearActiveCrewId();
+        clearCrew();
       }
     }, 30_000);
     return (): void => clearInterval(id);
-  }, [room, clearRoom]);
+  }, [crew, clearCrew]);
 
   return {
     isLoading,
@@ -133,114 +139,114 @@ export function useRoom(): UseRoomResult {
 }
 
 /**
- * Create a new room with a generated 6-letter code. Retries on the rare
+ * Create a new crew with a generated 6-letter code. Retries on the rare
  * unique-violation collision (alphabet is 31 chars, 6-char codes give
  * ~887M combinations — collisions are negligible in practice).
  */
-export async function createRoom(params: {
+export async function createCrew(params: {
   hostUserId: string;
   hostDisplayName: string;
   hostColor: string;
   name: string | null;
-}): Promise<{ room: HikeRoom | null; error: string | null }> {
+}): Promise<{ crew: HikeCrew | null; error: string | null }> {
   const { hostUserId, hostDisplayName, hostColor, name } = params;
 
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    const code = generateRoomCode();
+    const code = generateCrewCode();
     const { data, error } = await supabase
       .from('hike_rooms')
       .insert({ code, name, host_id: hostUserId })
       .select('*')
       .single();
     if (!error && data) {
-      const room = data as HikeRoom;
+      const crew = data as HikeCrew;
       // Auto-join the host as the first member.
-      const join = await joinRoom({
-        roomId: room.id,
+      const join = await joinCrew({
+        crewId: crew.id,
         userId: hostUserId,
         displayName: hostDisplayName,
         color: hostColor,
       });
-      if (join.error) return { room: null, error: join.error };
-      return { room, error: null };
+      if (join.error) return { crew: null, error: join.error };
+      return { crew, error: null };
     }
     if (error?.code !== '23505') {
       // Not a unique-violation — surface the error.
-      return { room: null, error: error?.message ?? 'Failed to create room' };
+      return { crew: null, error: error?.message ?? 'Failed to create crew' };
     }
   }
-  return { room: null, error: 'Could not generate a unique room code' };
+  return { crew: null, error: 'Could not generate a unique crew code' };
 }
 
 /**
- * Convenience: insert the member row, fetch room + members, hydrate the
+ * Convenience: insert the member row, fetch crew + members, hydrate the
  * store. Used by both the join flow and silent-rejoin on cold start.
  */
-export async function joinRoom(params: {
-  roomId: string;
+export async function joinCrew(params: {
+  crewId: string;
   userId: string;
   displayName: string;
   color: string;
 }): Promise<{ error: string | null }> {
-  const { roomId, userId, displayName, color } = params;
+  const { crewId, userId, displayName, color } = params;
   const { error: insertError } = await supabase.from('room_members').upsert({
-    room_id: roomId,
+    room_id: crewId,
     user_id: userId,
     display_name: displayName,
     color,
   });
   if (insertError) return { error: insertError.message };
 
-  const { data: roomRow, error: roomError } = await supabase
+  const { data: crewRow, error: crewError } = await supabase
     .from('hike_rooms')
     .select('*')
-    .eq('id', roomId)
+    .eq('id', crewId)
     .single();
-  if (roomError) return { error: roomError.message };
-  if ((roomRow as HikeRoom).ended_at) {
-    return { error: 'This room has ended.' };
+  if (crewError) return { error: crewError.message };
+  if ((crewRow as HikeCrew).ended_at) {
+    return { error: 'This crew has ended.' };
   }
 
   const { data: members, error: membersError } = await supabase
     .from('room_members')
     .select('*')
-    .eq('room_id', roomId);
+    .eq('room_id', crewId);
   if (membersError) return { error: membersError.message };
 
-  useRoomStore
+  useCrewStore
     .getState()
-    .setRoom(roomRow as HikeRoom, (members ?? []) as RoomMember[], userId);
+    .setCrew(crewRow as HikeCrew, (members ?? []) as CrewMember[], userId);
   return { error: null };
 }
 
-export async function leaveRoom(): Promise<void> {
-  const state = useRoomStore.getState();
-  const room = state.room;
+export async function leaveCrew(): Promise<void> {
+  const state = useCrewStore.getState();
+  const crew = state.crew;
   const myUserId = state.myUserId;
-  if (!room || !myUserId) return;
+  if (!crew || !myUserId) return;
 
   // Optimistic local clear, then DB delete. RLS allows the user to delete
   // their own member row; if it fails (already deleted, etc.) we don't care.
-  state.clearRoom();
-  await clearActiveRoomId();
+  state.clearCrew();
+  await clearActiveCrewId();
   await supabase
     .from('room_members')
     .delete()
-    .eq('room_id', room.id)
+    .eq('room_id', crew.id)
     .eq('user_id', myUserId);
 }
 
-export async function endRoomAsHost(): Promise<{ error: string | null }> {
-  const room = useRoomStore.getState().room;
-  if (!room) return { error: 'No active room' };
+export async function endCrewAsHost(): Promise<{ error: string | null }> {
+  const crew = useCrewStore.getState().crew;
+  if (!crew) return { error: 'No active crew' };
   const { error: rpcError } = await supabase.rpc('end_hike_room', {
-    p_room_id: room.id,
+    p_room_id: crew.id,
   });
   if (rpcError) return { error: rpcError.message };
   // The realtime UPDATE will fire and clear local state; force-clearing
   // here as well so the host sees instant feedback.
-  await clearActiveRoomId();
-  useRoomStore.getState().clearRoom();
+  await clearActiveCrewId();
+  useCrewStore.getState().clearCrew();
   return { error: null };
 }

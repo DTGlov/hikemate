@@ -10,15 +10,15 @@ import {
 } from 'react-native';
 
 import { Button } from '@/components/Button';
-import { joinRoom } from '@/hooks/useRoom';
-import { setActiveRoomId } from '@/lib/activeRoomPersistence';
+import { joinCrew } from '@/hooks/useCrew';
+import { setActiveCrewId } from '@/lib/activeCrewPersistence';
 import { emailToDisplayName } from '@/lib/displayName';
 import { colorForUser } from '@/lib/memberColor';
-import { isValidRoomCode } from '@/lib/roomCode';
+import { isValidCrewCode } from '@/lib/crewCode';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProfileStore } from '@/stores/useProfileStore';
-import type { HikeRoom } from '@/types/room';
+import type { HikeCrew } from '@/types/crew';
 
 const CODE_LENGTH = 6;
 
@@ -29,7 +29,7 @@ type Props = {
   initialCode?: string;
 };
 
-export function JoinRoomSheet({
+export function JoinCrewSheet({
   visible,
   onClose,
   initialCode,
@@ -63,15 +63,15 @@ export function JoinRoomSheet({
 
   const handleJoin = async (): Promise<void> => {
     if (!userId) return;
-    if (!isValidRoomCode(code)) {
+    if (!isValidCrewCode(code)) {
       setError('Enter a 6-character code');
       return;
     }
     setIsJoining(true);
     setError(null);
 
-    // Look up the room by code, ensuring it's active.
-    const { data: roomRow, error: lookupError } = await supabase
+    // Look up the crew by code, ensuring it's active.
+    const { data: crewRow, error: lookupError } = await supabase
       .from('hike_rooms')
       .select('*')
       .eq('code', code)
@@ -82,15 +82,15 @@ export function JoinRoomSheet({
       setError(lookupError.message);
       return;
     }
-    if (!roomRow) {
+    if (!crewRow) {
       setIsJoining(false);
-      setError('No active room found for that code.');
+      setError('No active crew found for that code.');
       return;
     }
-    const room = roomRow as HikeRoom;
-    if (new Date(room.expires_at).getTime() <= Date.now()) {
+    const crew = crewRow as HikeCrew;
+    if (new Date(crew.expires_at).getTime() <= Date.now()) {
       setIsJoining(false);
-      setError('This room has expired.');
+      setError('This crew has expired.');
       return;
     }
 
@@ -100,8 +100,8 @@ export function JoinRoomSheet({
         : userEmail
           ? emailToDisplayName(userEmail)
           : 'Hiker';
-    const { error: joinError } = await joinRoom({
-      roomId: room.id,
+    const { error: joinError } = await joinCrew({
+      crewId: crew.id,
       userId,
       displayName,
       color: colorForUser(userId),
@@ -111,7 +111,7 @@ export function JoinRoomSheet({
       setError(joinError);
       return;
     }
-    await setActiveRoomId(room.id);
+    await setActiveCrewId(crew.id);
     setCode('');
     onClose();
   };
@@ -141,7 +141,7 @@ export function JoinRoomSheet({
           <View className="gap-5">
             <View className="gap-1">
               <Text className="text-2xl font-bold text-gray-900">
-                Join a room
+                Join a crew
               </Text>
               <Text className="text-sm text-gray-600">
                 Enter the 6-letter code your group shared with you.
@@ -180,7 +180,7 @@ export function JoinRoomSheet({
               autoCorrect={false}
               maxLength={CODE_LENGTH}
               keyboardType="default"
-              accessibilityLabel="Room code"
+              accessibilityLabel="Crew code"
               style={{
                 position: 'absolute',
                 opacity: 0,
@@ -195,7 +195,7 @@ export function JoinRoomSheet({
 
             <View className="gap-3">
               <Button
-                label="Join Room"
+                label="Join Crew"
                 onPress={() => void handleJoin()}
                 isLoading={isJoining}
                 disabled={code.length !== CODE_LENGTH}

@@ -2,27 +2,30 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 
 import { supabase } from '@/lib/supabase';
 import type {
-  HikeRoom,
+  CrewMember,
+  CrewStatsBroadcast,
+  HikeCrew,
   MemberPositionBroadcast,
-  RoomMember,
-} from '@/types/room';
+} from '@/types/crew';
 
 const POSITION_BROADCAST_EVENT = 'position';
+const CREW_STATS_BROADCAST_EVENT = 'crew-stats';
 
-export type RoomChannelCallbacks = {
-  onMemberJoined: (member: RoomMember) => void;
+export type CrewChannelCallbacks = {
+  onMemberJoined: (member: CrewMember) => void;
   onMemberLeft: (userId: string) => void;
-  onMemberUpdated: (member: RoomMember) => void;
-  onRoomEnded: () => void;
+  onMemberUpdated: (member: CrewMember) => void;
+  onCrewEnded: () => void;
   onPositionBroadcast: (broadcast: MemberPositionBroadcast) => void;
+  onCrewStatsBroadcast: (broadcast: CrewStatsBroadcast) => void;
   onPresenceSync: (onlineUserIds: string[]) => void;
 };
 
 /**
- * One channel per room handles four concerns:
+ * One channel per crew handles four concerns:
  *   1. postgres_changes on room_members (INSERT/UPDATE/DELETE) — join/leave
  *      events and last_known_* sync for late joiners
- *   2. postgres_changes on hike_rooms (UPDATE) — host ending the room
+ *   2. postgres_changes on hike_rooms (UPDATE) — host ending the crew
  *   3. broadcast 'position' — high-frequency live position pings (5s)
  *   4. presence — online/offline tracking, keyed by user_id
  *
@@ -30,12 +33,12 @@ export type RoomChannelCallbacks = {
  * cleanup. The channel is auto-subscribed; presence.track() runs once
  * SUBSCRIBED status arrives.
  */
-export function subscribeToRoom(
-  roomId: string,
+export function subscribeToCrew(
+  crewId: string,
   myUserId: string,
-  callbacks: RoomChannelCallbacks,
+  callbacks: CrewChannelCallbacks,
 ): RealtimeChannel {
-  const channelName = `room:${roomId}`;
+  const channelName = `crew:${crewId}`;
   console.log('[RT] creating channel', { channelName, myUserId });
   const channel = supabase.channel(channelName, {
     config: { presence: { key: myUserId } },
@@ -48,10 +51,10 @@ export function subscribeToRoom(
         event: 'INSERT',
         schema: 'public',
         table: 'room_members',
-        filter: `room_id=eq.${roomId}`,
+        filter: `room_id=eq.${crewId}`,
       },
       (payload) => {
-        callbacks.onMemberJoined(payload.new as RoomMember);
+        callbacks.onMemberJoined(payload.new as CrewMember);
       },
     )
     .on(
@@ -60,10 +63,10 @@ export function subscribeToRoom(
         event: 'UPDATE',
         schema: 'public',
         table: 'room_members',
-        filter: `room_id=eq.${roomId}`,
+        filter: `room_id=eq.${crewId}`,
       },
       (payload) => {
-        callbacks.onMemberUpdated(payload.new as RoomMember);
+        callbacks.onMemberUpdated(payload.new as CrewMember);
       },
     )
     .on(
@@ -72,10 +75,10 @@ export function subscribeToRoom(
         event: 'DELETE',
         schema: 'public',
         table: 'room_members',
-        filter: `room_id=eq.${roomId}`,
+        filter: `room_id=eq.${crewId}`,
       },
       (payload) => {
-        const old = payload.old as Partial<RoomMember>;
+        const old = payload.old as Partial<CrewMember>;
         if (old.user_id) callbacks.onMemberLeft(old.user_id);
       },
     )
@@ -85,10 +88,10 @@ export function subscribeToRoom(
         event: 'UPDATE',
         schema: 'public',
         table: 'hike_rooms',
-        filter: `id=eq.${roomId}`,
+        filter: `id=eq.${crewId}`,
       },
       (payload) => {
-        if ((payload.new as HikeRoom).ended_at) callbacks.onRoomEnded();
+        if ((payload.new as HikeCrew).ended_at) callbacks.onCrewEnded();
       },
     )
     .on('broadcast', { event: POSITION_BROADCAST_EVENT }, (payload) => {
@@ -102,6 +105,13 @@ export function subscribeToRoom(
       // state already reflects current location via useLocationStore.
       if (broadcast.user_id === myUserId) return;
       callbacks.onPositionBroadcast(broadcast);
+    })
+    .on('broadcast', { event: CREW_STATS_BROADCAST_EVENT }, (payload) => {
+      const broadcast = payload.payload as CrewStatsBroadcast;
+      // Skip self — local hike-tracking store is already the source of
+      // truth for our own stats.
+      if (broadcast.user_id === myUserId) return;
+      callbacks.onCrewStatsBroadcast(broadcast);
     })
     .on('presence', { event: 'sync' }, () => {
       const state = channel.presenceState();
@@ -150,6 +160,17 @@ export function broadcastPosition(
     type: 'broadcast',
     event: POSITION_BROADCAST_EVENT,
     payload: position,
+  });
+}
+
+export function broadcastCrewStats(
+  channel: RealtimeChannel,
+  stats: CrewStatsBroadcast,
+): void {
+  void channel.send({
+    type: 'broadcast',
+    event: CREW_STATS_BROADCAST_EVENT,
+    payload: stats,
   });
 }
 

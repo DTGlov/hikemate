@@ -6,11 +6,11 @@ import { customAlphabet } from 'nanoid/non-secure';
 const ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
 const generate = customAlphabet(ALPHABET, 6);
 
-export function generateRoomCode(): string {
+export function generateCrewCode(): string {
   return generate();
 }
 
-export function isValidRoomCode(code: string): boolean {
+export function isValidCrewCode(code: string): boolean {
   if (code.length !== 6) return false;
   for (const ch of code) {
     if (!ALPHABET.includes(ch)) return false;

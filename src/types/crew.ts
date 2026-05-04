@@ -1,4 +1,4 @@
-export interface HikeRoom {
+export interface HikeCrew {
   id: string;
   code: string;
   name: string | null;
@@ -9,7 +9,7 @@ export interface HikeRoom {
   created_at: string;
 }
 
-export interface RoomMember {
+export interface CrewMember {
   room_id: string;
   user_id: string;
   display_name: string;
@@ -44,3 +44,26 @@ export interface MemberLivePosition {
   recentPath: RecentPathPoint[];
   isOnline: boolean;
 }
+
+/**
+ * Phase 6.5 — Hybrid Crew Stats. While a crew member is actively hiking
+ * they broadcast a snapshot of their HikeStats every 10s on the same crew
+ * channel as positions, but on a separate `crew-stats` event. When the
+ * member stops tracking, a one-shot { stopped: true } broadcast clears
+ * their entry from peers' livestats maps.
+ */
+export type CrewStatsBroadcast =
+  | {
+      user_id: string;
+      stopped?: false;
+      distance_meters: number;
+      duration_seconds: number;
+      current_pace_sec_per_km: number | null;
+      elevation_gain_meters: number;
+      timestamp: number;
+    }
+  | {
+      user_id: string;
+      stopped: true;
+      timestamp: number;
+    };

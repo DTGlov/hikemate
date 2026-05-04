@@ -5,10 +5,14 @@ import * as Haptics from 'expo-haptics';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 
-import { endRoomAsHost, leaveRoom } from '@/hooks/useRoom';
+import { endCrewAsHost, leaveCrew } from '@/hooks/useCrew';
 import { initialsFromDisplayName } from '@/lib/displayName';
-import { useRoomStore } from '@/stores/useRoomStore';
-import type { MemberLivePosition, RoomMember } from '@/types/room';
+import { formatDistance, formatDuration, formatPace } from '@/lib/units';
+import { useCrewStore } from '@/stores/useCrewStore';
+import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
+import { useProfileStore } from '@/stores/useProfileStore';
+import type { MemberLivePosition, CrewMember } from '@/types/crew';
+import type { HikeStats } from '@/types/hike';
 
 const SNAP_POINTS: string[] = ['18%', '55%', '92%'];
 const COPIED_INDICATOR_MS = 1500;
@@ -25,8 +29,9 @@ const COLOR = {
 };
 
 type Row = {
-  member: RoomMember;
+  member: CrewMember;
   position: MemberLivePosition | null;
+  stats: HikeStats | null;
   isMe: boolean;
 };
 
@@ -36,32 +41,58 @@ function statusLine(position: MemberLivePosition | null): string {
   return `Offline · ${formatDistanceToNow(position.timestamp, { addSuffix: true })}`;
 }
 
-export function RoomMembersBottomSheet(): React.JSX.Element | null {
-  const room = useRoomStore((s) => s.room);
-  const members = useRoomStore((s) => s.members);
-  const livePositions = useRoomStore((s) => s.livePositions);
-  const myUserId = useRoomStore((s) => s.myUserId);
-  const isHost = useRoomStore((s) => s.isHost);
+export function CrewMembersBottomSheet(): React.JSX.Element | null {
+  const crew = useCrewStore((s) => s.crew);
+  const members = useCrewStore((s) => s.members);
+  const livePositions = useCrewStore((s) => s.livePositions);
+  const liveStats = useCrewStore((s) => s.liveStats);
+  const myUserId = useCrewStore((s) => s.myUserId);
+  const isHost = useCrewStore((s) => s.isHost);
+  const unitSystem = useProfileStore((s) => s.profile?.unit_system ?? 'metric');
+
+  // Self stats from the local hike-tracking store — don't wait for our
+  // own broadcast to round-trip via the channel.
+  const ownTrackingStatus = useHikeTrackingStore((s) => s.status);
+  const ownStats = useHikeTrackingStore((s) => s.stats);
+  const isSelfTracking =
+    ownTrackingStatus === 'tracking' || ownTrackingStatus === 'paused';
 
   const sheetRef = useRef<BottomSheet>(null);
 
   const rows: Row[] = useMemo(() => {
     return Object.values(members)
-      .map((member) => ({
-        member,
-        position: livePositions[member.user_id] ?? null,
-        isMe: member.user_id === myUserId,
-      }))
+      .map((member) => {
+        const isMe = member.user_id === myUserId;
+        const stats = isMe
+          ? isSelfTracking
+            ? ownStats
+            : null
+          : (liveStats[member.user_id] ?? null);
+        return {
+          member,
+          position: livePositions[member.user_id] ?? null,
+          stats,
+          isMe,
+        };
+      })
       .sort((a, b) => {
         if (a.isMe !== b.isMe) return a.isMe ? -1 : 1;
-        const aHost = room?.host_id === a.member.user_id;
-        const bHost = room?.host_id === b.member.user_id;
+        const aHost = crew?.host_id === a.member.user_id;
+        const bHost = crew?.host_id === b.member.user_id;
         if (aHost !== bHost) return aHost ? -1 : 1;
         return a.member.display_name.localeCompare(b.member.display_name);
       });
-  }, [members, livePositions, myUserId, room?.host_id]);
+  }, [
+    members,
+    livePositions,
+    liveStats,
+    myUserId,
+    crew?.host_id,
+    isSelfTracking,
+    ownStats,
+  ]);
 
-  if (!room) return null;
+  if (!crew) return null;
 
   return (
     <BottomSheet
@@ -79,7 +110,7 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
       <BottomSheetView
         style={{ flex: 1, paddingHorizontal: 16, paddingTop: 8 }}
       >
-        <RoomHeader code={room.code} />
+        <CrewHeader code={crew.code} />
 
         <View
           style={{
@@ -105,7 +136,8 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
           <MemberRow
             key={row.member.user_id}
             row={row}
-            isHost={room.host_id === row.member.user_id}
+            isHost={crew.host_id === row.member.user_id}
+            unitSystem={unitSystem}
           />
         ))}
 
@@ -133,13 +165,13 @@ export function RoomMembersBottomSheet(): React.JSX.Element | null {
           }}
         />
 
-        {isHost ? <EndRoomButton /> : <LeaveRoomButton />}
+        {isHost ? <EndCrewButton /> : <LeaveCrewButton />}
       </BottomSheetView>
     </BottomSheet>
   );
 }
 
-function RoomHeader({ code }: { code: string }): React.JSX.Element {
+function CrewHeader({ code }: { code: string }): React.JSX.Element {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -158,7 +190,7 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
     void Haptics.selectionAsync().catch(() => undefined);
     try {
       await Share.share({
-        message: `Join my hike on HikeMate — code ${code}\nhikemate://room/${code}`,
+        message: `Join my hike on HikeMate — code ${code}\nhikemate://crew/${code}`,
       });
     } catch (err) {
       console.warn('Share failed', err);
@@ -175,12 +207,12 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
           color: COLOR.muted,
         }}
       >
-        ROOM
+        CREW
       </Text>
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel={`Copy room code ${code}`}
+        accessibilityLabel={`Copy crew code ${code}`}
         onPress={() => void onCopy()}
         style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}
       >
@@ -202,7 +234,7 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
 
       <Pressable
         accessibilityRole="button"
-        accessibilityLabel="Share room code"
+        accessibilityLabel="Share crew code"
         onPress={() => void onShare()}
         style={({ pressed }) => ({
           flexDirection: 'row',
@@ -225,13 +257,18 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
 function MemberRow({
   row,
   isHost: isHostRow,
+  unitSystem,
 }: {
   row: Row;
   isHost: boolean;
+  unitSystem: 'metric' | 'imperial';
 }): React.JSX.Element {
-  const { member, position, isMe } = row;
+  const { member, position, stats, isMe } = row;
   const isOnline = position?.isOnline ?? false;
   const status = statusLine(position);
+  const statsLine = stats
+    ? `${formatDistance(stats.distanceMeters, unitSystem)} · ${formatDuration(stats.durationSeconds)} · ${formatPace(stats.currentPaceSecPerKm, unitSystem)}`
+    : null;
 
   return (
     <View
@@ -282,6 +319,19 @@ function MemberRow({
         >
           {status}
         </Text>
+        {statsLine ? (
+          <Text
+            numberOfLines={1}
+            ellipsizeMode="tail"
+            style={{
+              fontSize: 12,
+              color: COLOR.brand,
+              fontWeight: '500',
+            }}
+          >
+            {statsLine}
+          </Text>
+        ) : null}
       </View>
 
       <View
@@ -296,11 +346,11 @@ function MemberRow({
   );
 }
 
-function LeaveRoomButton(): React.JSX.Element {
+function LeaveCrewButton(): React.JSX.Element {
   const [isWorking, setIsWorking] = useState(false);
 
   const onPress = (): void => {
-    Alert.alert('Leave room?', 'You can rejoin anytime with the code.', [
+    Alert.alert('Leave crew?', 'You can rejoin anytime with the code.', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Leave',
@@ -310,7 +360,7 @@ function LeaveRoomButton(): React.JSX.Element {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
             () => undefined,
           );
-          await leaveRoom();
+          await leaveCrew();
           setIsWorking(false);
         },
       },
@@ -320,7 +370,7 @@ function LeaveRoomButton(): React.JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="Leave room"
+      accessibilityLabel="Leave crew"
       disabled={isWorking}
       onPress={onPress}
       style={({ pressed }) => ({
@@ -337,32 +387,32 @@ function LeaveRoomButton(): React.JSX.Element {
       })}
     >
       <Text style={{ color: COLOR.danger, fontWeight: '600', fontSize: 16 }}>
-        Leave Room
+        Leave Crew
       </Text>
     </Pressable>
   );
 }
 
-function EndRoomButton(): React.JSX.Element {
+function EndCrewButton(): React.JSX.Element {
   const [isWorking, setIsWorking] = useState(false);
 
   const onPress = (): void => {
     Alert.alert(
-      'End this room?',
+      'End this crew?',
       'All members will be disconnected. This cannot be undone.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
-          text: 'End Room',
+          text: 'End Crew',
           style: 'destructive',
           onPress: async () => {
             setIsWorking(true);
             void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy).catch(
               () => undefined,
             );
-            const { error } = await endRoomAsHost();
+            const { error } = await endCrewAsHost();
             setIsWorking(false);
-            if (error) Alert.alert('Could not end room', error);
+            if (error) Alert.alert('Could not end crew', error);
           },
         },
       ],
@@ -372,7 +422,7 @@ function EndRoomButton(): React.JSX.Element {
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityLabel="End room for everyone"
+      accessibilityLabel="End crew for everyone"
       disabled={isWorking}
       onPress={onPress}
       style={({ pressed }) => ({
@@ -389,7 +439,7 @@ function EndRoomButton(): React.JSX.Element {
       })}
     >
       <Text style={{ color: COLOR.danger, fontWeight: '600', fontSize: 16 }}>
-        End Room for Everyone
+        End Crew for Everyone
       </Text>
     </Pressable>
   );

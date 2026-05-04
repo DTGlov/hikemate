@@ -2,15 +2,15 @@ import { PointAnnotation } from '@rnmapbox/maps';
 import { Text, View } from 'react-native';
 
 import { initialsFromDisplayName } from '@/lib/displayName';
-import type { MemberLivePosition, RoomMember } from '@/types/room';
+import type { MemberLivePosition, CrewMember } from '@/types/crew';
 
 type Props = {
-  member: RoomMember;
+  member: CrewMember;
   position: MemberLivePosition;
   onSelected?: () => void;
 };
 
-export function RoomMemberDot({
+export function CrewMemberDot({
   member,
   position,
   onSelected,

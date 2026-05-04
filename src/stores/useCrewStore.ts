@@ -2,35 +2,41 @@ import type { RealtimeChannel } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
 import type {
-  HikeRoom,
+  CrewMember,
+  CrewStatsBroadcast,
+  HikeCrew,
   MemberLivePosition,
   MemberPositionBroadcast,
-  RoomMember,
-} from '@/types/room';
+} from '@/types/crew';
+import type { HikeStats } from '@/types/hike';
 
 const RECENT_PATH_WINDOW_MS = 30 * 60 * 1000;
 const RECENT_PATH_MAX_POINTS = 360; // 30 min × 12 broadcasts/min cap
 
-type RoomState = {
-  room: HikeRoom | null;
+type CrewState = {
+  crew: HikeCrew | null;
   myUserId: string | null;
-  members: Record<string, RoomMember>;
+  members: Record<string, CrewMember>;
   livePositions: Record<string, MemberLivePosition>;
+  // Live HikeStats from each tracking member, keyed by user_id. Ephemeral —
+  // populated by Phase 6.5 'crew-stats' broadcasts; cleared on stop.
+  liveStats: Record<string, HikeStats>;
   isHost: boolean;
-  // Live realtime channel for this room. Held in store (not a ref) so
+  // Live realtime channel for this crew. Held in store (not a ref) so
   // every consumer re-renders when it appears or disappears — refs don't
   // trigger reconciliation and React 18 batching can swallow the
   // surrounding setState calls used to "wake" subscribers.
   channel: RealtimeChannel | null;
 
-  setRoom: (room: HikeRoom, members: RoomMember[], myUserId: string) => void;
-  upsertMember: (member: RoomMember) => void;
+  setCrew: (crew: HikeCrew, members: CrewMember[], myUserId: string) => void;
+  upsertMember: (member: CrewMember) => void;
   removeMember: (userId: string) => void;
   updateMemberPosition: (broadcast: MemberPositionBroadcast) => void;
+  updateMemberStats: (broadcast: CrewStatsBroadcast) => void;
   setOnlineUserIds: (onlineUserIds: string[]) => void;
   setChannel: (channel: RealtimeChannel | null) => void;
   clearChannel: () => void;
-  clearRoom: () => void;
+  clearCrew: () => void;
 };
 
 function pruneRecentPath(
@@ -50,7 +56,7 @@ function pruneRecentPath(
   return trimmed;
 }
 
-function seedLivePosition(member: RoomMember): MemberLivePosition | null {
+function seedLivePosition(member: CrewMember): MemberLivePosition | null {
   if (member.last_known_lat === null || member.last_known_lng === null) {
     return null;
   }
@@ -65,19 +71,20 @@ function seedLivePosition(member: RoomMember): MemberLivePosition | null {
   };
 }
 
-export const useRoomStore = create<RoomState>((set, get) => ({
-  room: null,
+export const useCrewStore = create<CrewState>((set, get) => ({
+  crew: null,
   myUserId: null,
   members: {},
   livePositions: {},
+  liveStats: {},
   isHost: false,
   channel: null,
 
   setChannel: (channel): void => set({ channel }),
   clearChannel: (): void => set({ channel: null }),
 
-  setRoom: (room, members, myUserId): void => {
-    const memberMap: Record<string, RoomMember> = {};
+  setCrew: (crew, members, myUserId): void => {
+    const memberMap: Record<string, CrewMember> = {};
     const positions: Record<string, MemberLivePosition> = {};
     for (const m of members) {
       memberMap[m.user_id] = m;
@@ -85,11 +92,12 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       if (seed) positions[m.user_id] = seed;
     }
     set({
-      room,
+      crew,
       myUserId,
       members: memberMap,
       livePositions: positions,
-      isHost: room.host_id === myUserId,
+      liveStats: {},
+      isHost: crew.host_id === myUserId,
     });
   },
 
@@ -121,9 +129,11 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     if (!state.members[userId]) return;
     const members = { ...state.members };
     const livePositions = { ...state.livePositions };
+    const liveStats = { ...state.liveStats };
     delete members[userId];
     delete livePositions[userId];
-    set({ members, livePositions });
+    delete liveStats[userId];
+    set({ members, livePositions, liveStats });
   },
 
   updateMemberPosition: (broadcast): void => {
@@ -156,6 +166,25 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     });
   },
 
+  updateMemberStats: (broadcast): void => {
+    const state = get();
+    if (!state.members[broadcast.user_id]) return; // ignore strangers
+    const next = { ...state.liveStats };
+    if (broadcast.stopped) {
+      if (!(broadcast.user_id in next)) return;
+      delete next[broadcast.user_id];
+    } else {
+      next[broadcast.user_id] = {
+        distanceMeters: broadcast.distance_meters,
+        durationSeconds: broadcast.duration_seconds,
+        elevationGainMeters: broadcast.elevation_gain_meters,
+        elevationLossMeters: 0,
+        currentPaceSecPerKm: broadcast.current_pace_sec_per_km,
+      };
+    }
+    set({ liveStats: next });
+  },
+
   setOnlineUserIds: (onlineUserIds): void => {
     const state = get();
     const onlineSet = new Set(onlineUserIds);
@@ -170,12 +199,13 @@ export const useRoomStore = create<RoomState>((set, get) => ({
     if (changed) set({ livePositions: next });
   },
 
-  clearRoom: (): void => {
+  clearCrew: (): void => {
     set({
-      room: null,
+      crew: null,
       myUserId: null,
       members: {},
       livePositions: {},
+      liveStats: {},
       isHost: false,
       channel: null,
     });

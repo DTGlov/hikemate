@@ -13,20 +13,20 @@ import {
 } from 'react-native';
 
 import { Button } from '@/components/Button';
-import { setActiveRoomId } from '@/lib/activeRoomPersistence';
+import { setActiveCrewId } from '@/lib/activeCrewPersistence';
 import { emailToDisplayName } from '@/lib/displayName';
 import { colorForUser } from '@/lib/memberColor';
-import { createRoom } from '@/hooks/useRoom';
+import { createCrew } from '@/hooks/useCrew';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProfileStore } from '@/stores/useProfileStore';
-import type { HikeRoom } from '@/types/room';
+import type { HikeCrew } from '@/types/crew';
 
 type Props = {
   visible: boolean;
   onClose: () => void;
 };
 
-export function CreateRoomSheet({
+export function CreateCrewSheet({
   visible,
   onClose,
 }: Props): React.JSX.Element {
@@ -37,7 +37,7 @@ export function CreateRoomSheet({
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [createdRoom, setCreatedRoom] = useState<HikeRoom | null>(null);
+  const [createdCrew, setCreatedCrew] = useState<HikeCrew | null>(null);
 
   const displayName =
     profileName?.trim() && profileName.trim() !== userEmail
@@ -50,38 +50,38 @@ export function CreateRoomSheet({
     if (!userId) return;
     setIsCreating(true);
     setError(null);
-    const { room, error: createError } = await createRoom({
+    const { crew, error: createError } = await createCrew({
       hostUserId: userId,
       hostDisplayName: displayName,
       hostColor: colorForUser(userId),
       name: name.trim() ? name.trim() : `${displayName}'s Hike`,
     });
     setIsCreating(false);
-    if (createError || !room) {
-      setError(createError ?? 'Failed to create room');
+    if (createError || !crew) {
+      setError(createError ?? 'Failed to create crew');
       return;
     }
-    setCreatedRoom(room);
-    await setActiveRoomId(room.id);
+    setCreatedCrew(crew);
+    await setActiveCrewId(crew.id);
   };
 
   const handleClose = (): void => {
     setName('');
-    setCreatedRoom(null);
+    setCreatedCrew(null);
     setError(null);
     onClose();
   };
 
   const handleCopyCode = async (): Promise<void> => {
-    if (!createdRoom) return;
-    await Clipboard.setStringAsync(createdRoom.code);
+    if (!createdCrew) return;
+    await Clipboard.setStringAsync(createdCrew.code);
   };
 
   const handleShare = async (): Promise<void> => {
-    if (!createdRoom) return;
+    if (!createdCrew) return;
     try {
       await Share.share({
-        message: `Join my hike on HikeMate — code ${createdRoom.code}\nhikemate://room/${createdRoom.code}`,
+        message: `Join my hike on HikeMate — code ${createdCrew.code}\nhikemate://crew/${createdCrew.code}`,
       });
     } catch (err) {
       console.warn('Share failed', err);
@@ -104,11 +104,11 @@ export function CreateRoomSheet({
             <View className="h-1 w-12 rounded-full bg-gray-300" />
           </View>
 
-          {createdRoom ? (
+          {createdCrew ? (
             <View className="gap-5">
               <View className="items-center gap-2">
                 <Text className="text-2xl font-bold text-gray-900">
-                  Room ready
+                  Crew ready
                 </Text>
                 <Text className="text-center text-sm text-gray-600">
                   Share this code with people you want to hike with.
@@ -116,7 +116,7 @@ export function CreateRoomSheet({
               </View>
               <View className="items-center rounded-2xl bg-teal-50 px-6 py-6">
                 <Text className="text-5xl font-bold tracking-[6px] text-teal-700">
-                  {createdRoom.code}
+                  {createdCrew.code}
                 </Text>
               </View>
               <View className="flex-row gap-3">
@@ -147,7 +147,7 @@ export function CreateRoomSheet({
             <View className="gap-5">
               <View className="gap-1">
                 <Text className="text-2xl font-bold text-gray-900">
-                  Create a room
+                  Create a crew
                 </Text>
                 <Text className="text-sm text-gray-600">
                   Get a 6-letter code to share with the group.
@@ -156,7 +156,7 @@ export function CreateRoomSheet({
 
               <View className="gap-1.5">
                 <Text className="text-sm font-medium text-gray-700">
-                  Room name (optional)
+                  Crew name (optional)
                 </Text>
                 <TextInput
                   value={name}
@@ -173,7 +173,7 @@ export function CreateRoomSheet({
 
               <View className="gap-3">
                 <Button
-                  label="Create Room"
+                  label="Create Crew"
                   onPress={() => void handleCreate()}
                   isLoading={isCreating}
                 />
