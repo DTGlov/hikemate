@@ -13,11 +13,19 @@ import { HikePathLayer } from '@/components/hike/HikePathLayer';
 import { StartHikeButton } from '@/components/hike/StartHikeButton';
 import { StopHikeConfirmModal } from '@/components/hike/StopHikeConfirmModal';
 import { RecenterButton } from '@/components/map/RecenterButton';
+import { CreateRoomSheet } from '@/components/room/CreateRoomSheet';
+import { JoinRoomSheet } from '@/components/room/JoinRoomSheet';
+import { MemberDetailCard } from '@/components/room/MemberDetailCard';
+import { RoomEntryFabs } from '@/components/room/RoomEntryFabs';
+import { RoomMemberDot } from '@/components/room/RoomMemberDot';
+import { RoomMemberPathLayer } from '@/components/room/RoomMemberPathLayer';
+import { RoomMembersBottomSheet } from '@/components/room/RoomMembersBottomSheet';
 import { useAlwaysPermission } from '@/hooks/useAlwaysPermission';
 import { useBackgroundHikeTracker } from '@/hooks/useBackgroundHikeTracker';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
+import { useRoomStore } from '@/stores/useRoomStore';
 
 const DEFAULT_ZOOM = 15;
 
@@ -45,10 +53,19 @@ export function HikeMap(): React.JSX.Element {
   const startHike = useHikeTrackingStore((s) => s.startHike);
   const isHikeActive = hikeStatus === 'tracking' || hikeStatus === 'paused';
 
+  const room = useRoomStore((s) => s.room);
+  const members = useRoomStore((s) => s.members);
+  const livePositions = useRoomStore((s) => s.livePositions);
+  const myUserId = useRoomStore((s) => s.myUserId);
+  const inRoom = room !== null;
+
   const cameraRef = useRef<Camera>(null);
   const [stopModalVisible, setStopModalVisible] = useState(false);
   const [explainerVisible, setExplainerVisible] = useState(false);
   const [isWorking, setIsWorking] = useState(false);
+  const [createRoomVisible, setCreateRoomVisible] = useState(false);
+  const [joinRoomVisible, setJoinRoomVisible] = useState(false);
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
 
   useEffect(() => {
     void loadLastKnownLocation();
@@ -71,7 +88,7 @@ export function HikeMap(): React.JSX.Element {
     [isFollowingUser, setFollowingUser],
   );
 
-  const beginHike = useCallback((): void => {
+ const beginHike = useCallback((): void => {
     setFollowingUser(true);
     startHike();
   }, [setFollowingUser, startHike]);
@@ -142,6 +159,10 @@ export function HikeMap(): React.JSX.Element {
   const isLocating = isFollowingUser && currentLocation === null;
   const showForegroundOnlyBanner =
     isHikeActive && alwaysStatus === 'foreground-only';
+  const selectedMember = selectedMemberId ? members[selectedMemberId] : null;
+  const selectedPosition = selectedMemberId
+    ? livePositions[selectedMemberId]
+    : null;
 
   return (
     <View className="flex-1">
@@ -164,6 +185,39 @@ export function HikeMap(): React.JSX.Element {
         />
         <UserLocation visible androidRenderMode="gps" />
         {isHikeActive ? <HikePathLayer points={trackingPoints} /> : null}
+
+        {/* Room overlays — paths under dots so dots stay on top. */}
+        {inRoom
+          ? Object.values(livePositions)
+              .filter((p) => p.user_id !== myUserId)
+              .map((position) => {
+                const member = members[position.user_id];
+                if (!member) return null;
+                return (
+                  <RoomMemberPathLayer
+                    key={`path-${position.user_id}`}
+                    position={position}
+                    color={member.color}
+                  />
+                );
+              })
+          : null}
+        {inRoom
+          ? Object.values(livePositions)
+              .filter((p) => p.user_id !== myUserId)
+              .map((position) => {
+                const member = members[position.user_id];
+                if (!member) return null;
+                return (
+                  <RoomMemberDot
+                    key={`dot-${position.user_id}`}
+                    member={member}
+                    position={position}
+                    onSelected={() => setSelectedMemberId(position.user_id)}
+                  />
+                );
+              })
+          : null}
       </MapView>
 
       {isLocating && !isHikeActive ? (
@@ -187,7 +241,15 @@ export function HikeMap(): React.JSX.Element {
       ) : (
         <>
           <RecenterButton cameraRef={cameraRef} />
-          <StartHikeButton onPress={() => void onStartHike()} />
+          {!inRoom ? (
+            <>
+              <StartHikeButton onPress={() => void onStartHike()} />
+              <RoomEntryFabs
+                onCreate={() => setCreateRoomVisible(true)}
+                onJoin={() => setJoinRoomVisible(true)}
+              />
+            </>
+          ) : null}
         </>
       )}
 
@@ -197,10 +259,27 @@ export function HikeMap(): React.JSX.Element {
         onAllow={() => void onAllowAlways()}
         onLater={() => void onLater()}
       />
+      {selectedMember && selectedPosition ? (
+        <MemberDetailCard
+          member={selectedMember}
+          position={selectedPosition}
+          onClose={() => setSelectedMemberId(null)}
+        />
+      ) : null}
+
+      {inRoom ? <RoomMembersBottomSheet /> : null}
 
       <StopHikeConfirmModal
         visible={stopModalVisible}
         onClose={() => setStopModalVisible(false)}
+      />
+      <CreateRoomSheet
+        visible={createRoomVisible}
+        onClose={() => setCreateRoomVisible(false)}
+      />
+      <JoinRoomSheet
+        visible={joinRoomVisible}
+        onClose={() => setJoinRoomVisible(false)}
       />
     </View>
   );
