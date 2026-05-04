@@ -103,6 +103,15 @@ export function CreateCrewSheet({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         className="flex-1 justify-end bg-black/50"
       >
+        {/* Backdrop catches taps above the sheet and dismisses. The inner
+            sheet sits below this Pressable in the layout tree, so taps on
+            the white surface don't bubble through. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Dismiss"
+          onPress={handleClose}
+          style={{ flex: 1 }}
+        />
         <View className="rounded-t-3xl bg-white p-6 pb-10">
           <View className="mb-4 items-center">
             <View className="h-1 w-12 rounded-full bg-gray-300" />
