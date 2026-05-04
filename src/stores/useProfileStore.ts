@@ -75,10 +75,26 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
       set({ profile: current });
       return { error: error.message };
     }
+    // Mirror the new name into any active crew membership rows so peers
+    // see the change via the realtime UPDATE on room_members. RLS limits
+    // this to the current user's own rows. Failure here is non-fatal —
+    // profiles is the source of truth; crew snapshots just shadow it.
+    const { error: roomError } = await supabase
+      .from('room_members')
+      .update({ display_name: trimmed })
+      .eq('user_id', current.id);
+    if (roomError) {
+      console.warn(
+        '[profile] room_members display_name sync failed:',
+        roomError.message,
+      );
+    }
     return { error: null };
   },
 
-  updateAvatarSeed: async (next: string): Promise<{ error: string | null }> => {
+  updateAvatarSeed: async (
+    next: string,
+  ): Promise<{ error: string | null }> => {
     const current = get().profile;
     if (!current) return { error: 'No profile loaded' };
     set({ profile: { ...current, avatar_seed: next } });
@@ -89,6 +105,18 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     if (error) {
       set({ profile: current });
       return { error: error.message };
+    }
+    // Same crew-shadow pattern as updateDisplayName so live crew rows
+    // reflect the new avatar without rejoin.
+    const { error: roomError } = await supabase
+      .from('room_members')
+      .update({ avatar_seed: next })
+      .eq('user_id', current.id);
+    if (roomError) {
+      console.warn(
+        '[profile] room_members avatar_seed sync failed:',
+        roomError.message,
+      );
     }
     return { error: null };
   },

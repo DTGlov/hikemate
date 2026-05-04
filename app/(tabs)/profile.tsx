@@ -5,7 +5,6 @@ import * as Linking from 'expo-linking';
 import * as SecureStore from 'expo-secure-store';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Easing,
   Pressable,
@@ -17,6 +16,11 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Avatar } from '@/components/avatar/Avatar';
+import {
+  EditDisplayNameModal,
+  type EditDisplayNameModalHandle,
+} from '@/components/profile/EditDisplayNameModal';
+import { ProfileRow } from '@/components/profile/ProfileRow';
 import { StatPill } from '@/components/profile/StatPill';
 import { OfflineMapsSection } from '@/components/settings/OfflineMapsSection';
 import { UnitToggle } from '@/components/settings/UnitToggle';
@@ -29,6 +33,7 @@ import { useProfileStore } from '@/stores/useProfileStore';
 
 const HINT_DISMISSED_KEY = 'hikemate_avatar_hint_dismissed';
 const REGEN_DEBOUNCE_MS = 1000;
+const SECTION_PADDING_X = 20;
 
 function randomAvatarSeed(): string {
   // 11+ chars of base36 entropy — DiceBear hashes the seed so any string
@@ -47,12 +52,31 @@ export default function ProfileScreen(): React.JSX.Element {
   const unitSystem: UnitSystem = profile?.unit_system ?? 'metric';
   const displayName = profile?.display_name?.trim() || userEmail || 'Hiker';
 
+  const editNameRef = useRef<EditDisplayNameModalHandle>(null);
+
   const { hikes } = useHikes();
   const totalHikes = hikes?.length ?? 0;
   const totalDistanceMeters =
     hikes?.reduce((sum, h) => sum + h.distance_meters, 0) ?? 0;
   const totalElevationMeters =
     hikes?.reduce((sum, h) => sum + h.elevation_gain_meters, 0) ?? 0;
+
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const onSignOut = useCallback(async (): Promise<void> => {
+    setIsSigningOut(true);
+    await signOut();
+    setIsSigningOut(false);
+  }, [signOut]);
+
+  const onSendFeedback = useCallback((): void => {
+    void Linking.openURL(
+      'mailto:dave@hikemate.app?subject=HikeMate%20feedback',
+    ).catch(() => undefined);
+  }, []);
+
+  const onEditName = useCallback((): void => {
+    editNameRef.current?.present();
+  }, []);
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
@@ -62,13 +86,14 @@ export default function ProfileScreen(): React.JSX.Element {
           displayName={displayName}
           fallbackColor={profile ? colorForUser(profile.id) : '#0f766e'}
           updateAvatarSeed={updateAvatarSeed}
+          onEditName={onEditName}
         />
 
         <View
           style={{
             flexDirection: 'row',
             gap: 8,
-            paddingHorizontal: 16,
+            paddingHorizontal: SECTION_PADDING_X,
             marginTop: 20,
           }}
         >
@@ -90,34 +115,51 @@ export default function ProfileScreen(): React.JSX.Element {
         </View>
 
         <Section title="Account">
-          <Row label="Email" value={userEmail ?? '—'} />
-          <SignOutRow onSignOut={signOut} />
+          <ProfileRow
+            icon="mail-outline"
+            label="Email"
+            value={userEmail ?? '—'}
+          />
+          <ProfileRow
+            icon="log-out-outline"
+            label="Sign Out"
+            onPress={() => void onSignOut()}
+            destructive
+            loading={isSigningOut}
+          />
         </Section>
 
         <Section title="Preferences">
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
-            <Text className="mb-2 text-sm font-medium text-gray-700">
-              Units
-            </Text>
-            <UnitToggle />
-          </View>
+          <UnitsBlock />
           <BiometricRow />
         </Section>
 
         <Section title="Offline Maps">
-          <View style={{ paddingHorizontal: 16, paddingVertical: 12 }}>
+          <View
+            style={{
+              paddingHorizontal: SECTION_PADDING_X,
+              paddingVertical: 12,
+            }}
+          >
             <OfflineMapsSection />
           </View>
         </Section>
 
         <Section title="About">
-          <Row
+          <ProfileRow
+            icon="information-circle-outline"
             label="Version"
             value={`v${Constants.expoConfig?.version ?? '1.0.0'}`}
           />
-          <FeedbackRow />
+          <ProfileRow
+            icon="chatbubble-ellipses-outline"
+            label="Send feedback"
+            onPress={onSendFeedback}
+          />
         </Section>
       </ScrollView>
+
+      <EditDisplayNameModal ref={editNameRef} />
     </SafeAreaView>
   );
 }
@@ -127,11 +169,13 @@ function Hero({
   displayName,
   fallbackColor,
   updateAvatarSeed,
+  onEditName,
 }: {
   avatarSeed: string | null;
   displayName: string;
   fallbackColor: string;
   updateAvatarSeed: (next: string) => Promise<{ error: string | null }>;
+  onEditName: () => void;
 }): React.JSX.Element {
   const scale = useRef(new Animated.Value(1)).current;
   const lastRegenAt = useRef(0);
@@ -201,12 +245,30 @@ function Hero({
           />
         </Animated.View>
       </Pressable>
-      <Text
-        style={{ fontSize: 22, fontWeight: '500', color: '#111827' }}
-        numberOfLines={1}
+
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Edit display name"
+        onPress={onEditName}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 8,
+          backgroundColor: pressed ? '#f3f4f6' : 'transparent',
+        })}
       >
-        {displayName}
-      </Text>
+        <Text
+          style={{ fontSize: 22, fontWeight: '500', color: '#111827' }}
+          numberOfLines={1}
+        >
+          {displayName}
+        </Text>
+        <Ionicons name="pencil-outline" size={18} color="#6b7280" />
+      </Pressable>
+
       {!hintHidden ? (
         <Text style={{ fontSize: 12, color: '#6b7280' }}>
           Tap avatar to regenerate
@@ -235,50 +297,42 @@ function Section({
           letterSpacing: 1,
           color: '#6b7280',
           textTransform: 'uppercase',
-          paddingHorizontal: 16,
+          paddingHorizontal: SECTION_PADDING_X,
           marginBottom: 8,
         }}
       >
         {title}
       </Text>
-      <View
-        style={{
-          borderTopWidth: 1,
-          borderTopColor: '#f3f4f6',
-        }}
-      >
+      <View style={{ borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
         {children}
       </View>
     </View>
   );
 }
 
-function Row({
-  label,
-  value,
-}: {
-  label: string;
-  value: string;
-}): React.JSX.Element {
+function UnitsBlock(): React.JSX.Element {
   return (
     <View
       style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 56,
-        paddingHorizontal: 16,
+        paddingHorizontal: SECTION_PADDING_X,
+        paddingTop: 12,
+        paddingBottom: 16,
         borderBottomWidth: 1,
         borderBottomColor: '#f3f4f6',
       }}
     >
-      <Text style={{ fontSize: 16, color: '#111827' }}>{label}</Text>
-      <Text
-        style={{ fontSize: 16, color: '#6b7280', flexShrink: 1 }}
-        numberOfLines={1}
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          gap: 12,
+          marginBottom: 8,
+        }}
       >
-        {value}
-      </Text>
+        <Ionicons name="speedometer-outline" size={20} color="#6b7280" />
+        <Text style={{ fontSize: 16, color: '#111827' }}>Units</Text>
+      </View>
+      <UnitToggle />
     </View>
   );
 }
@@ -286,94 +340,19 @@ function Row({
 function BiometricRow(): React.JSX.Element {
   const { isEnabled, isLoading, setEnabled } = useBiometricLockPref();
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        height: 56,
-        paddingHorizontal: 16,
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
-      }}
-    >
-      <Text style={{ fontSize: 16, color: '#111827' }}>Face ID Lock</Text>
-      <Switch
-        value={isEnabled}
-        disabled={isLoading}
-        onValueChange={(next) => void setEnabled(next)}
-        trackColor={{ true: '#0f766e', false: '#d1d5db' }}
-        accessibilityLabel="Face ID Lock"
-        accessibilityRole="switch"
-      />
-    </View>
-  );
-}
-
-function SignOutRow({
-  onSignOut,
-}: {
-  onSignOut: () => Promise<{ error: { message: string } | null }>;
-}): React.JSX.Element {
-  const [isWorking, setIsWorking] = useState(false);
-  const onPress = async (): Promise<void> => {
-    setIsWorking(true);
-    await onSignOut();
-    setIsWorking(false);
-  };
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Sign out"
-      onPress={() => void onPress()}
-      style={({ pressed }) => ({
-        height: 56,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        backgroundColor: pressed ? '#fef2f2' : '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
-      })}
-      disabled={isWorking}
-    >
-      <Text style={{ fontSize: 16, color: '#dc2626', fontWeight: '500' }}>
-        Sign Out
-      </Text>
-      {isWorking ? (
-        <ActivityIndicator size="small" color="#dc2626" />
-      ) : (
-        <Ionicons name="log-out-outline" size={18} color="#dc2626" />
-      )}
-    </Pressable>
-  );
-}
-
-function FeedbackRow(): React.JSX.Element {
-  const onPress = (): void => {
-    void Linking.openURL(
-      'mailto:dave@hikemate.app?subject=HikeMate%20feedback',
-    ).catch(() => undefined);
-  };
-  return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel="Send feedback"
-      onPress={onPress}
-      style={({ pressed }) => ({
-        height: 56,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        backgroundColor: pressed ? '#f9fafb' : '#ffffff',
-        borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
-      })}
-    >
-      <Text style={{ fontSize: 16, color: '#111827' }}>Send feedback</Text>
-      <Ionicons name="mail-outline" size={18} color="#6b7280" />
-    </Pressable>
+    <ProfileRow
+      icon="lock-closed-outline"
+      label="Face ID Lock"
+      control={
+        <Switch
+          value={isEnabled}
+          disabled={isLoading}
+          onValueChange={(next) => void setEnabled(next)}
+          trackColor={{ true: '#0f766e', false: '#d1d5db' }}
+          accessibilityLabel="Face ID Lock"
+          accessibilityRole="switch"
+        />
+      }
+    />
   );
 }
