@@ -33,6 +33,9 @@ export function CreateCrewSheet({
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const userEmail = useAuthStore((s) => s.user?.email ?? null);
   const profileName = useProfileStore((s) => s.profile?.display_name ?? null);
+  const profileAvatarSeed = useProfileStore(
+    (s) => s.profile?.avatar_seed ?? null,
+  );
 
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
@@ -54,6 +57,7 @@ export function CreateCrewSheet({
       hostUserId: userId,
       hostDisplayName: displayName,
       hostColor: colorForUser(userId),
+      hostAvatarSeed: profileAvatarSeed ?? userId,
       name: name.trim() ? name.trim() : `${displayName}'s Hike`,
     });
     setIsCreating(false);

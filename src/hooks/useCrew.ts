@@ -77,6 +77,7 @@ export function useCrew(): UseCrewResult {
         if (cancelled) return;
         setEndedReason('host-ended');
         void clearActiveCrewId();
+        useCrewStore.getState().snapshotForSummary();
         clearCrew();
       },
       onPositionBroadcast: (broadcast) => {
@@ -172,6 +173,7 @@ export function useCrew(): UseCrewResult {
       if (Date.now() >= expiresAt) {
         setEndedReason('host-ended');
         void clearActiveCrewId();
+        useCrewStore.getState().snapshotForSummary();
         clearCrew();
       }
     }, 30_000);
@@ -194,9 +196,11 @@ export async function createCrew(params: {
   hostUserId: string;
   hostDisplayName: string;
   hostColor: string;
+  hostAvatarSeed: string;
   name: string | null;
 }): Promise<{ crew: HikeCrew | null; error: string | null }> {
-  const { hostUserId, hostDisplayName, hostColor, name } = params;
+  const { hostUserId, hostDisplayName, hostColor, hostAvatarSeed, name } =
+    params;
 
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
@@ -214,6 +218,7 @@ export async function createCrew(params: {
         userId: hostUserId,
         displayName: hostDisplayName,
         color: hostColor,
+        avatarSeed: hostAvatarSeed,
       });
       if (join.error) return { crew: null, error: join.error };
       return { crew, error: null };
@@ -235,13 +240,15 @@ export async function joinCrew(params: {
   userId: string;
   displayName: string;
   color: string;
+  avatarSeed: string;
 }): Promise<{ error: string | null }> {
-  const { crewId, userId, displayName, color } = params;
+  const { crewId, userId, displayName, color, avatarSeed } = params;
   const { error: insertError } = await supabase.from('room_members').upsert({
     room_id: crewId,
     user_id: userId,
     display_name: displayName,
     color,
+    avatar_seed: avatarSeed,
   });
   if (insertError) return { error: insertError.message };
 
@@ -294,6 +301,7 @@ export async function endCrewAsHost(): Promise<{ error: string | null }> {
   // The realtime UPDATE will fire and clear local state; force-clearing
   // here as well so the host sees instant feedback.
   await clearActiveCrewId();
+  useCrewStore.getState().snapshotForSummary();
   useCrewStore.getState().clearCrew();
   return { error: null };
 }

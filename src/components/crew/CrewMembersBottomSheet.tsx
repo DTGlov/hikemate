@@ -7,8 +7,8 @@ import { Alert, Pressable, Share, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 
+import { Avatar } from '@/components/avatar/Avatar';
 import { endCrewAsHost, leaveCrew } from '@/hooks/useCrew';
-import { initialsFromDisplayName } from '@/lib/displayName';
 import { formatDistance, formatDuration, formatPace } from '@/lib/units';
 import { useCrewStore } from '@/stores/useCrewStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
@@ -16,7 +16,7 @@ import { useProfileStore } from '@/stores/useProfileStore';
 import type { MemberLivePosition, CrewMember } from '@/types/crew';
 import type { HikeStats } from '@/types/hike';
 
-const SNAP_POINTS: string[] = ['18%', '55%', '92%'];
+const SNAP_POINTS: string[] = ['22%', '55%', '92%'];
 const COPIED_INDICATOR_MS = 1500;
 
 const COLOR = {
@@ -101,7 +101,7 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
     <BottomSheet
       ref={sheetRef}
       snapPoints={SNAP_POINTS}
-      index={1}
+      index={0}
       enablePanDownToClose={false}
       backgroundStyle={{ backgroundColor: COLOR.white }}
       handleIndicatorStyle={{
@@ -285,20 +285,14 @@ function MemberRow({
         paddingVertical: 12,
       }}
     >
-      <View
-        style={{
-          width: 44,
-          height: 44,
-          borderRadius: 22,
-          backgroundColor: member.color,
-          alignItems: 'center',
-          justifyContent: 'center',
-          opacity: isOnline ? 1 : 0.55,
-        }}
-      >
-        <Text style={{ color: COLOR.white, fontWeight: '700', fontSize: 14 }}>
-          {initialsFromDisplayName(member.display_name)}
-        </Text>
+      <View style={{ opacity: isOnline ? 1 : 0.55 }}>
+        <Avatar
+          seed={member.avatar_seed}
+          displayName={member.display_name}
+          fallbackColor={member.color}
+          size={44}
+          ringColor={member.color}
+        />
       </View>
 
       <View style={{ flex: 1, flexDirection: 'column', gap: 2 }}>
@@ -362,8 +356,13 @@ function MemberRow({
 
 function LeaveCrewButton(): React.JSX.Element {
   const [isWorking, setIsWorking] = useState(false);
+  const snapshotForSummary = useCrewStore((s) => s.snapshotForSummary);
 
   const onPress = (): void => {
+    // Three options: Cancel / Leave / View Summary. The summary path
+    // snapshots the live crew state into useCrewStore.lastEndedCrew
+    // BEFORE leaveCrew wipes the live slots — the root layout watches
+    // lastEndedCrew and pushes /crew-summary/[roomId] when it appears.
     Alert.alert('Leave crew?', 'You can rejoin anytime with the code.', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -374,6 +373,18 @@ function LeaveCrewButton(): React.JSX.Element {
           void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
             () => undefined,
           );
+          await leaveCrew();
+          setIsWorking(false);
+        },
+      },
+      {
+        text: 'View Summary',
+        onPress: async () => {
+          setIsWorking(true);
+          void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(
+            () => undefined,
+          );
+          snapshotForSummary();
           await leaveCrew();
           setIsWorking(false);
         },

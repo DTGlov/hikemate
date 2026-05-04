@@ -10,6 +10,7 @@ export interface UserProfile {
   display_name: string | null;
   unit_system: UnitSystem;
   subscription_tier: SubscriptionTier;
+  avatar_seed: string;
   created_at: string;
   updated_at: string;
 }
