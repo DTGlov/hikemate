@@ -1,4 +1,3 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
 import { useEffect, useRef } from 'react';
 
 import { haversineMeters } from '@/lib/geo';
@@ -20,10 +19,18 @@ const DB_WRITE_DISTANCE_M = 50;
  * The DB write isn't for the live UX (broadcast handles that); it's the
  * snapshot that late joiners see while waiting for the next broadcast.
  */
-export function useRoomBroadcast(channel: RealtimeChannel | null): void {
+export function useRoomBroadcast(): void {
+  const channel = useRoomStore((s) => s.channel);
   const room = useRoomStore((s) => s.room);
   const myUserId = useAuthStore((s) => s.user?.id ?? null);
   const currentLocation = useLocationStore((s) => s.currentLocation);
+
+  console.log('[RT-MOUNT] useRoomBroadcast mounted', {
+    hasChannel: !!channel,
+    channelState: channel?.state,
+    hasCurrentLocation: !!currentLocation,
+    myUserId: useAuthStore.getState().user?.id,
+  });
 
   const lastBroadcastAtRef = useRef<number>(0);
   const lastDbWriteAtRef = useRef<number>(0);
@@ -45,6 +52,20 @@ export function useRoomBroadcast(channel: RealtimeChannel | null): void {
     // Broadcast (5s throttle).
     if (now - lastBroadcastAtRef.current >= BROADCAST_INTERVAL_MS) {
       lastBroadcastAtRef.current = now;
+      const channelState = channel.state;
+      console.log('[RT] broadcast attempt', {
+        userId: myUserId,
+        roomId: room.id,
+        lat: currentLocation.latitude,
+        lng: currentLocation.longitude,
+        channelState,
+      });
+      if (channelState !== 'joined') {
+        console.warn('[RT] broadcast SKIPPED — channel not joined', {
+          channelState,
+          userId: myUserId,
+        });
+      }
       broadcastPosition(channel, {
         user_id: myUserId,
         lat: currentLocation.latitude,

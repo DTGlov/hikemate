@@ -94,8 +94,10 @@ export default function RootLayout(): React.JSX.Element {
   const segments = useSegments();
 
   // Wire the realtime channel for the currently-joined room (no-op if none).
-  const { channel: roomChannel } = useRoom();
-  useRoomBroadcast(roomChannel);
+  // The channel itself is published into useRoomStore by useRoom; broadcast
+  // reads it from there so a single store update wakes all subscribers.
+  useRoom();
+  useRoomBroadcast();
 
   const restoredRef = useRef(false);
 

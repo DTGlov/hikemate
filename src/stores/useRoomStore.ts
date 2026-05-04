@@ -1,3 +1,4 @@
+import type { RealtimeChannel } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
 import type {
@@ -16,12 +17,19 @@ type RoomState = {
   members: Record<string, RoomMember>;
   livePositions: Record<string, MemberLivePosition>;
   isHost: boolean;
+  // Live realtime channel for this room. Held in store (not a ref) so
+  // every consumer re-renders when it appears or disappears — refs don't
+  // trigger reconciliation and React 18 batching can swallow the
+  // surrounding setState calls used to "wake" subscribers.
+  channel: RealtimeChannel | null;
 
   setRoom: (room: HikeRoom, members: RoomMember[], myUserId: string) => void;
   upsertMember: (member: RoomMember) => void;
   removeMember: (userId: string) => void;
   updateMemberPosition: (broadcast: MemberPositionBroadcast) => void;
   setOnlineUserIds: (onlineUserIds: string[]) => void;
+  setChannel: (channel: RealtimeChannel | null) => void;
+  clearChannel: () => void;
   clearRoom: () => void;
 };
 
@@ -63,6 +71,10 @@ export const useRoomStore = create<RoomState>((set, get) => ({
   members: {},
   livePositions: {},
   isHost: false,
+  channel: null,
+
+  setChannel: (channel): void => set({ channel }),
+  clearChannel: (): void => set({ channel: null }),
 
   setRoom: (room, members, myUserId): void => {
     const memberMap: Record<string, RoomMember> = {};
@@ -165,6 +177,7 @@ export const useRoomStore = create<RoomState>((set, get) => ({
       members: {},
       livePositions: {},
       isHost: false,
+      channel: null,
     });
   },
 }));

@@ -166,9 +166,7 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
   };
 
   return (
-    <View
-      style={{ flexDirection: 'column', gap: 8, paddingVertical: 16 }}
-    >
+    <View style={{ flexDirection: 'column', gap: 8, paddingVertical: 16 }}>
       <Text
         style={{
           fontSize: 11,
@@ -216,9 +214,7 @@ function RoomHeader({ code }: { code: string }): React.JSX.Element {
           backgroundColor: pressed ? COLOR.brandActive : COLOR.brand,
         })}
       >
-        <Text
-          style={{ color: COLOR.white, fontWeight: '600', fontSize: 15 }}
-        >
+        <Text style={{ color: COLOR.white, fontWeight: '600', fontSize: 15 }}>
           Share Code
         </Text>
       </Pressable>
@@ -263,9 +259,7 @@ function MemberRow({
       </View>
 
       <View style={{ flex: 1, flexDirection: 'column', gap: 2 }}>
-        <View
-          style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}
-        >
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
           <Text
             numberOfLines={1}
             ellipsizeMode="tail"

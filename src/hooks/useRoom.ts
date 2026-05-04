@@ -1,5 +1,4 @@
-import type { RealtimeChannel } from '@supabase/supabase-js';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { clearActiveRoomId } from '@/lib/activeRoomPersistence';
 import { subscribeToRoom, teardownChannel } from '@/lib/realtimeChannels';
@@ -10,7 +9,6 @@ import { useRoomStore } from '@/stores/useRoomStore';
 import type { HikeRoom, RoomMember } from '@/types/room';
 
 type UseRoomResult = {
-  channel: RealtimeChannel | null;
   isLoading: boolean;
   error: string | null;
   endedReason: 'host-ended' | null;
@@ -32,9 +30,10 @@ export function useRoom(): UseRoomResult {
   const removeMember = useRoomStore((s) => s.removeMember);
   const updateMemberPosition = useRoomStore((s) => s.updateMemberPosition);
   const setOnlineUserIds = useRoomStore((s) => s.setOnlineUserIds);
+  const setChannel = useRoomStore((s) => s.setChannel);
+  const clearChannel = useRoomStore((s) => s.clearChannel);
   const clearRoom = useRoomStore((s) => s.clearRoom);
 
-  const channelRef = useRef<RealtimeChannel | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [endedReason, setEndedReason] =
@@ -44,9 +43,11 @@ export function useRoom(): UseRoomResult {
     setEndedReason(null);
     if (!room || !myUserId) {
       // Tear down any leftover channel from a prior room session.
-      const existing = channelRef.current;
-      channelRef.current = null;
-      if (existing) void teardownChannel(existing);
+      const existing = useRoomStore.getState().channel;
+      if (existing) {
+        clearChannel();
+        void teardownChannel(existing);
+      }
       return;
     }
 
@@ -82,13 +83,17 @@ export function useRoom(): UseRoomResult {
         setOnlineUserIds(onlineUserIds);
       },
     });
-    channelRef.current = channel;
+    // Publish the channel into the store so every subscriber re-renders
+    // and picks it up — relying on co-located setState calls to "wake"
+    // consumers is unsafe under React 18 batching when those states
+    // collapse to no-ops (see commit message for the bug we just fixed).
+    setChannel(channel);
     setIsLoading(false);
 
     return (): void => {
       cancelled = true;
-      const captured = channelRef.current;
-      channelRef.current = null;
+      const captured = useRoomStore.getState().channel;
+      clearChannel();
       if (captured) void teardownChannel(captured);
     };
   }, [
@@ -98,6 +103,8 @@ export function useRoom(): UseRoomResult {
     removeMember,
     updateMemberPosition,
     setOnlineUserIds,
+    setChannel,
+    clearChannel,
     clearRoom,
     room,
   ]);
@@ -119,7 +126,6 @@ export function useRoom(): UseRoomResult {
   }, [room, clearRoom]);
 
   return {
-    channel: channelRef.current,
     isLoading,
     error,
     endedReason,
