@@ -308,14 +308,15 @@ export function HikeMap(): React.JSX.Element {
       ) : (
         <>
           <RecenterButton cameraRef={cameraRef} />
+          {/* Hiking is independent of crew membership — Phase 6.5's
+              Hybrid Crew Stats specifically requires that members in
+              a crew can still tap Start Hike to broadcast their stats. */}
+          <StartHikeButton onPress={() => void onStartHike()} />
           {!inCrew ? (
-            <>
-              <StartHikeButton onPress={() => void onStartHike()} />
-              <CrewEntryFabs
-                onCreate={() => setCreateCrewVisible(true)}
-                onJoin={() => setJoinCrewVisible(true)}
-              />
-            </>
+            <CrewEntryFabs
+              onCreate={() => setCreateCrewVisible(true)}
+              onJoin={() => setJoinCrewVisible(true)}
+            />
           ) : null}
           {/* Phase 7 — host-only meeting point control. Hidden during
               drop-pin mode (the hint banner takes its place) and during
