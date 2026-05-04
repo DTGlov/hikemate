@@ -6,5 +6,5 @@
 export function avatarUrl(seed: string, size: number = 200): string {
   const safeSeed = encodeURIComponent(seed);
   const safeSize = Math.max(16, Math.min(512, Math.floor(size * 2)));
-  return `https://api.dicebear.com/9.x/bottts/svg?seed=${safeSeed}&size=${safeSize}`;
+  return `https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${safeSeed}&size=${safeSize}`;
 }
