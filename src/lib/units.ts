@@ -31,15 +31,19 @@ export function formatPace(
   secondsPerKm: number | null,
   system: UnitSystem,
 ): string {
-  if (secondsPerKm === null || !Number.isFinite(secondsPerKm)) return '—';
+  const suffix = system === 'imperial' ? '/mi' : '/km';
+  if (secondsPerKm === null || !Number.isFinite(secondsPerKm)) {
+    return `—:— ${suffix}`;
+  }
   const secondsPerUnit =
     system === 'imperial'
       ? secondsPerKm * (METERS_PER_MILE / 1000)
       : secondsPerKm;
-  if (secondsPerUnit < 0 || !Number.isFinite(secondsPerUnit)) return '—';
+  if (secondsPerUnit < 0 || !Number.isFinite(secondsPerUnit)) {
+    return `—:— ${suffix}`;
+  }
   const minutes = Math.floor(secondsPerUnit / 60);
   const seconds = Math.round(secondsPerUnit % 60);
-  const suffix = system === 'imperial' ? '/mi' : '/km';
   return `${minutes}:${pad2(seconds)} ${suffix}`;
 }
 

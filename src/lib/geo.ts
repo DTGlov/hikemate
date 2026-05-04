@@ -7,7 +7,7 @@ export type LatLng = {
 
 const EARTH_RADIUS_METERS = 6_371_008.8;
 const DEFAULT_ELEVATION_NOISE_FLOOR_M = 3;
-const DEFAULT_PACE_WINDOW_SECONDS = 30;
+const DEFAULT_PACE_WINDOW_SECONDS = 60;
 
 function toRadians(degrees: number): number {
   return (degrees * Math.PI) / 180;

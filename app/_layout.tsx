@@ -272,7 +272,7 @@ export default function RootLayout(): React.JSX.Element {
   }
 
   return (
-<GestureHandlerRootView style={{ flex: 1 }}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
         <View className="flex-1">
           <Stack screenOptions={{ headerShown: false }}>

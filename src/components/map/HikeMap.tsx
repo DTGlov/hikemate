@@ -88,7 +88,7 @@ export function HikeMap(): React.JSX.Element {
     [isFollowingUser, setFollowingUser],
   );
 
- const beginHike = useCallback((): void => {
+  const beginHike = useCallback((): void => {
     setFollowingUser(true);
     startHike();
   }, [setFollowingUser, startHike]);

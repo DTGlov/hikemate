@@ -7,7 +7,7 @@ import Mapbox, {
 } from '@rnmapbox/maps';
 import { format } from 'date-fns';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -20,6 +20,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
 import { useHike } from '@/hooks/useHike';
+import { boundingBox } from '@/lib/geo';
 import { supabase } from '@/lib/supabase';
 import {
   formatDistance,
@@ -30,14 +31,15 @@ import {
 import { useProfileStore } from '@/stores/useProfileStore';
 import type { SavedHike } from '@/types/hike';
 
-const MAP_PADDING = {
-  paddingLeft: 40,
-  paddingRight: 40,
-  paddingTop: 80,
-  paddingBottom: 320,
-};
+// Uniform padding around the route so the polyline doesn't sit at the
+// screen edge. Earlier this used an asymmetric `paddingBottom: 320` that
+// was meant for a layout where the map was full-screen with a bottom
+// sheet overlay — but the detail map only fills the top 2/5 of the
+// screen, so 320 of bottom padding zoomed the camera all the way out
+// (Mapbox's response to "fit into negative viewport area").
+const MAP_PADDING = 60;
 
-function bufferBounds(bbox: [number, number, number, number]): {
+function bufferedBounds(bbox: [number, number, number, number]): {
   ne: [number, number];
   sw: [number, number];
 } {
@@ -56,14 +58,34 @@ export default function HikeDetailScreen(): React.JSX.Element {
   const router = useRouter();
   const { hike, isLoading, error, refresh } = useHike(id ?? null);
 
+  // We landed here via router.replace from the stop modal, so the native
+  // back stack has nothing to pop. Route explicitly to the Hikes tab.
+  const onBack = (): void => {
+    router.replace('/(tabs)/hikes');
+  };
+
+  const headerTitle = hike
+    ? (hike.name ?? `Hike on ${format(new Date(hike.started_at), 'PP')}`)
+    : '';
+
   return (
     <View className="flex-1 bg-white">
       <Stack.Screen
         options={{
           headerShown: true,
-          title: '',
-          headerBackTitle: 'Back',
+          title: headerTitle,
           headerShadowVisible: false,
+          headerLeft: () => (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Back to hikes"
+              onPress={onBack}
+              hitSlop={10}
+              style={{ paddingHorizontal: 4 }}
+            >
+              <Ionicons name="chevron-back" size={28} color="#0f766e" />
+            </Pressable>
+          ),
         }}
       />
       {isLoading && !hike ? (
@@ -99,6 +121,8 @@ function HikeDetail({
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const cameraRef = useRef<Camera>(null);
+
   const lineShape = useMemo<GeoJSON.Feature<GeoJSON.LineString>>(
     () => ({
       type: 'Feature',
@@ -111,10 +135,32 @@ function HikeDetail({
     [hike.path],
   );
 
-  const bounds = useMemo(
-    () => bufferBounds(hike.bounding_box),
-    [hike.bounding_box],
-  );
+  // Prefer the saved bounding_box; fall back to recomputing from the path
+  // for any legacy rows that pre-date the column. Defensive — without this
+  // the camera would have nothing to fit and stay zoomed at world view.
+  const bounds = useMemo(() => {
+    const isValidBbox =
+      Array.isArray(hike.bounding_box) &&
+      hike.bounding_box.length === 4 &&
+      hike.bounding_box.every((n) => Number.isFinite(n));
+    const bbox = isValidBbox
+      ? (hike.bounding_box as [number, number, number, number])
+      : boundingBox(hike.path);
+    console.log('[hikeDetail] computing bounds', {
+      hikeId: hike.id,
+      hadStoredBbox: isValidBbox,
+      bbox,
+      pathPoints: hike.path.length,
+    });
+    return bufferedBounds(bbox);
+  }, [hike.bounding_box, hike.path, hike.id]);
+
+  // Fit the camera once the style is ready. Doing this on mount via
+  // defaultSettings races against the style load — the camera command is
+  // silently dropped if it lands first.
+  const onDidFinishLoadingStyle = useCallback((): void => {
+    cameraRef.current?.fitBounds(bounds.ne, bounds.sw, MAP_PADDING, 0);
+  }, [bounds]);
 
   const startedAt = new Date(hike.started_at);
   const endedAt = new Date(hike.ended_at);
@@ -172,16 +218,11 @@ function HikeDetail({
         <MapView
           style={{ flex: 1 }}
           styleURL={Mapbox.StyleURL.Outdoors}
+          onDidFinishLoadingStyle={onDidFinishLoadingStyle}
           scaleBarEnabled={false}
           compassEnabled={false}
         >
-          <Camera
-            defaultSettings={{
-              bounds,
-              padding: MAP_PADDING,
-            }}
-            animationMode="none"
-          />
+          <Camera ref={cameraRef} animationMode="none" />
           <ShapeSource id="detail-path-source" shape={lineShape}>
             <LineLayer
               id="detail-path-line"
