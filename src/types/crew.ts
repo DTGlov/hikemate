@@ -7,6 +7,39 @@ export interface HikeCrew {
   ended_at: string | null;
   expires_at: string;
   created_at: string;
+  // Phase 7 — meeting point columns. Null when the host hasn't dropped a
+  // pin (or has cleared it).
+  meeting_point_lat: number | null;
+  meeting_point_lng: number | null;
+  meeting_point_label: string | null;
+  meeting_point_set_at: string | null;
+}
+
+/**
+ * Phase 7 — derived view of the meeting-point columns on hike_rooms.
+ * Null when the host hasn't dropped a pin.
+ */
+export interface MeetingPoint {
+  lat: number;
+  lng: number;
+  label: string;
+  setAt: string;
+}
+
+export function extractMeetingPoint(crew: HikeCrew): MeetingPoint | null {
+  if (
+    crew.meeting_point_lat === null ||
+    crew.meeting_point_lng === null ||
+    crew.meeting_point_set_at === null
+  ) {
+    return null;
+  }
+  return {
+    lat: crew.meeting_point_lat,
+    lng: crew.meeting_point_lng,
+    label: crew.meeting_point_label ?? 'Meeting Point',
+    setAt: crew.meeting_point_set_at,
+  };
 }
 
 export interface CrewMember {

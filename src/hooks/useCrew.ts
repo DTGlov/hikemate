@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { AppState, type AppStateStatus } from 'react-native';
 
 import { clearActiveCrewId } from '@/lib/activeCrewPersistence';
 import { subscribeToCrew, teardownChannel } from '@/lib/realtimeChannels';
@@ -30,6 +31,9 @@ export function useCrew(): UseCrewResult {
   const removeMember = useCrewStore((s) => s.removeMember);
   const updateMemberPosition = useCrewStore((s) => s.updateMemberPosition);
   const updateMemberStats = useCrewStore((s) => s.updateMemberStats);
+  const setMeetingPointLocal = useCrewStore((s) => s.setMeetingPointLocal);
+  const recordArrival = useCrewStore((s) => s.recordArrival);
+  const setArrivals = useCrewStore((s) => s.setArrivals);
   const setOnlineUserIds = useCrewStore((s) => s.setOnlineUserIds);
   const setChannel = useCrewStore((s) => s.setChannel);
   const clearChannel = useCrewStore((s) => s.clearChannel);
@@ -83,6 +87,14 @@ export function useCrew(): UseCrewResult {
         if (cancelled) return;
         updateMemberStats(broadcast);
       },
+      onMeetingPointChanged: (point) => {
+        if (cancelled) return;
+        setMeetingPointLocal(point);
+      },
+      onArrival: (userId, arrivedAt) => {
+        if (cancelled) return;
+        recordArrival(userId, arrivedAt);
+      },
       onPresenceSync: (onlineUserIds) => {
         if (cancelled) return;
         setOnlineUserIds(onlineUserIds);
@@ -108,12 +120,47 @@ export function useCrew(): UseCrewResult {
     removeMember,
     updateMemberPosition,
     updateMemberStats,
+    setMeetingPointLocal,
+    recordArrival,
     setOnlineUserIds,
     setChannel,
     clearChannel,
     clearCrew,
     crew,
   ]);
+
+  // Phase 7 — fetch existing arrivals on join, and re-fetch on AppState
+  // 'active' to recover from realtime gaps while backgrounded. Also covers
+  // the cold-start case where the geofence fired in the background and
+  // wrote a row before the foreground subscription was alive.
+  useEffect(() => {
+    if (!crew) return;
+    let cancelled = false;
+    const fetchArrivals = async (): Promise<void> => {
+      const { data, error: fetchErr } = await supabase
+        .from('meeting_point_arrivals')
+        .select('user_id, arrived_at')
+        .eq('room_id', crew.id);
+      if (cancelled) return;
+      if (fetchErr) {
+        console.warn('[crew] fetch arrivals failed:', fetchErr.message);
+        return;
+      }
+      const map: Record<string, string> = {};
+      for (const row of data ?? []) {
+        map[row.user_id as string] = row.arrived_at as string;
+      }
+      setArrivals(map);
+    };
+    void fetchArrivals();
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (next === 'active') void fetchArrivals();
+    });
+    return (): void => {
+      cancelled = true;
+      sub.remove();
+    };
+  }, [crew, setArrivals]);
 
   // Re-poll the crew row periodically to detect 24-hour expiry. The host
   // ending the crew is delivered via UPDATE realtime; expiry just rolls

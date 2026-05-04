@@ -1,13 +1,16 @@
 import type { RealtimeChannel } from '@supabase/supabase-js';
 import { create } from 'zustand';
 
+import { supabase } from '@/lib/supabase';
 import type {
   CrewMember,
   CrewStatsBroadcast,
   HikeCrew,
+  MeetingPoint,
   MemberLivePosition,
   MemberPositionBroadcast,
 } from '@/types/crew';
+import { extractMeetingPoint } from '@/types/crew';
 import type { HikeStats } from '@/types/hike';
 
 const RECENT_PATH_WINDOW_MS = 30 * 60 * 1000;
@@ -21,6 +24,11 @@ type CrewState = {
   // Live HikeStats from each tracking member, keyed by user_id. Ephemeral —
   // populated by Phase 6.5 'crew-stats' broadcasts; cleared on stop.
   liveStats: Record<string, HikeStats>;
+  // Phase 7 — meeting point pin (one per crew, host-managed).
+  meetingPoint: MeetingPoint | null;
+  // Phase 7 — arrivals at the meeting point, keyed by user_id, value is
+  // the ISO arrived_at timestamp.
+  arrivals: Record<string, string>;
   isHost: boolean;
   // Live realtime channel for this crew. Held in store (not a ref) so
   // every consumer re-renders when it appears or disappears — refs don't
@@ -37,6 +45,16 @@ type CrewState = {
   setChannel: (channel: RealtimeChannel | null) => void;
   clearChannel: () => void;
   clearCrew: () => void;
+
+  // Phase 7 — meeting point + arrivals.
+  setMeetingPointLocal: (next: MeetingPoint | null) => void;
+  setMeetingPointRemote: (
+    lat: number,
+    lng: number,
+  ) => Promise<{ error: string | null }>;
+  clearMeetingPointRemote: () => Promise<{ error: string | null }>;
+  recordArrival: (userId: string, arrivedAt: string) => void;
+  setArrivals: (arrivals: Record<string, string>) => void;
 };
 
 function pruneRecentPath(
@@ -77,6 +95,8 @@ export const useCrewStore = create<CrewState>((set, get) => ({
   members: {},
   livePositions: {},
   liveStats: {},
+  meetingPoint: null,
+  arrivals: {},
   isHost: false,
   channel: null,
 
@@ -97,6 +117,8 @@ export const useCrewStore = create<CrewState>((set, get) => ({
       members: memberMap,
       livePositions: positions,
       liveStats: {},
+      meetingPoint: extractMeetingPoint(crew),
+      arrivals: {},
       isHost: crew.host_id === myUserId,
     });
   },
@@ -206,8 +228,81 @@ export const useCrewStore = create<CrewState>((set, get) => ({
       members: {},
       livePositions: {},
       liveStats: {},
+      meetingPoint: null,
+      arrivals: {},
       isHost: false,
       channel: null,
     });
+  },
+
+  setMeetingPointLocal: (next): void => {
+    set({ meetingPoint: next });
+  },
+
+  setMeetingPointRemote: async (
+    lat,
+    lng,
+  ): Promise<{ error: string | null }> => {
+    const state = get();
+    if (!state.crew || !state.isHost) {
+      return { error: 'Only the host can set the meeting point' };
+    }
+    // Optimistic — flip the local pin immediately so the host's UI is
+    // responsive. The realtime UPDATE for hike_rooms will reach other
+    // members and fire setMeetingPointLocal there.
+    const previous = state.meetingPoint;
+    const optimistic: MeetingPoint = {
+      lat,
+      lng,
+      label: previous?.label ?? 'Meeting Point',
+      setAt: new Date().toISOString(),
+    };
+    set({ meetingPoint: optimistic });
+
+    const { error } = await supabase
+      .from('hike_rooms')
+      .update({
+        meeting_point_lat: lat,
+        meeting_point_lng: lng,
+        meeting_point_set_at: optimistic.setAt,
+      })
+      .eq('id', state.crew.id);
+    if (error) {
+      set({ meetingPoint: previous });
+      return { error: error.message };
+    }
+    return { error: null };
+  },
+
+  clearMeetingPointRemote: async (): Promise<{ error: string | null }> => {
+    const state = get();
+    if (!state.crew || !state.isHost) {
+      return { error: 'Only the host can clear the meeting point' };
+    }
+    const previous = state.meetingPoint;
+    set({ meetingPoint: null });
+    const { error } = await supabase
+      .from('hike_rooms')
+      .update({
+        meeting_point_lat: null,
+        meeting_point_lng: null,
+        meeting_point_set_at: null,
+      })
+      .eq('id', state.crew.id);
+    if (error) {
+      set({ meetingPoint: previous });
+      return { error: error.message };
+    }
+    return { error: null };
+  },
+
+  recordArrival: (userId, arrivedAt): void => {
+    const state = get();
+    if (state.arrivals[userId]) return;
+    set({ arrivals: { ...state.arrivals, [userId]: arrivedAt } });
+  },
+
+  setArrivals: (arrivals): void => {
+    set({ arrivals });
   },
 }));
