@@ -23,7 +23,7 @@ export function TextField<TForm extends FieldValues>({
   const hasError = Boolean(errorMessage);
   return (
     <View className="gap-1.5">
-      <Text className="text-sm font-medium text-gray-700">{label}</Text>
+      <Text className="font-medium text-sm text-gray-700">{label}</Text>
       <Controller
         control={control}
         name={name}

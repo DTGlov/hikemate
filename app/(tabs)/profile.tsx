@@ -27,13 +27,14 @@ import { UnitToggle } from '@/components/settings/UnitToggle';
 import { useBiometricLockPref } from '@/hooks/useBiometricLockPref';
 import { useHikes } from '@/hooks/useHikes';
 import { colorForUser } from '@/lib/memberColor';
+import { colors, fontFamily, fontSize, lineHeight, spacing } from '@/lib/theme';
 import { formatDistance, formatElevation, type UnitSystem } from '@/lib/units';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProfileStore } from '@/stores/useProfileStore';
 
 const HINT_DISMISSED_KEY = 'hikemate_avatar_hint_dismissed';
 const REGEN_DEBOUNCE_MS = 1000;
-const SECTION_PADDING_X = 20;
+const SECTION_PADDING_X = spacing.lg;
 
 function randomAvatarSeed(): string {
   // 11+ chars of base36 entropy — DiceBear hashes the seed so any string
@@ -257,25 +258,50 @@ function Hero({
           paddingHorizontal: 10,
           paddingVertical: 4,
           borderRadius: 8,
-          backgroundColor: pressed ? '#f3f4f6' : 'transparent',
+          backgroundColor: pressed ? colors.surfaceMuted : 'transparent',
         })}
       >
         <Text
-          style={{ fontSize: 22, fontWeight: '500', color: '#111827' }}
+          style={{
+            fontFamily: fontFamily.medium,
+            fontSize: fontSize.heading3,
+            lineHeight: lineHeight.heading3,
+            color: colors.textPrimary,
+          }}
           numberOfLines={1}
         >
           {displayName}
         </Text>
-        <Ionicons name="pencil-outline" size={18} color="#6b7280" />
+        <Ionicons
+          name="pencil-outline"
+          size={18}
+          color={colors.textSecondary}
+        />
       </Pressable>
 
       {!hintHidden ? (
-        <Text style={{ fontSize: 12, color: '#6b7280' }}>
+        <Text
+          style={{
+            fontFamily: fontFamily.regular,
+            fontSize: fontSize.small,
+            lineHeight: lineHeight.small,
+            color: colors.textSecondary,
+          }}
+        >
           Tap avatar to regenerate
         </Text>
       ) : null}
       {error ? (
-        <Text style={{ fontSize: 12, color: '#dc2626' }}>{error}</Text>
+        <Text
+          style={{
+            fontFamily: fontFamily.regular,
+            fontSize: fontSize.small,
+            lineHeight: lineHeight.small,
+            color: colors.danger,
+          }}
+        >
+          {error}
+        </Text>
       ) : null}
     </View>
   );
@@ -289,21 +315,22 @@ function Section({
   children: React.ReactNode;
 }): React.JSX.Element {
   return (
-    <View style={{ marginTop: 28 }}>
+    <View style={{ marginTop: spacing.xxl }}>
       <Text
         style={{
-          fontSize: 11,
-          fontWeight: '500',
+          fontFamily: fontFamily.medium,
+          fontSize: fontSize.caption,
+          lineHeight: lineHeight.caption,
           letterSpacing: 1,
-          color: '#6b7280',
+          color: colors.textSecondary,
           textTransform: 'uppercase',
           paddingHorizontal: SECTION_PADDING_X,
-          marginBottom: 8,
+          marginBottom: spacing.sm,
         }}
       >
         {title}
       </Text>
-      <View style={{ borderTopWidth: 1, borderTopColor: '#f3f4f6' }}>
+      <View style={{ borderTopWidth: 1, borderTopColor: colors.divider }}>
         {children}
       </View>
     </View>
@@ -315,22 +342,35 @@ function UnitsBlock(): React.JSX.Element {
     <View
       style={{
         paddingHorizontal: SECTION_PADDING_X,
-        paddingTop: 12,
-        paddingBottom: 16,
+        paddingTop: spacing.md,
+        paddingBottom: spacing.base,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: colors.divider,
       }}
     >
       <View
         style={{
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 12,
-          marginBottom: 8,
+          gap: spacing.md,
+          marginBottom: spacing.sm,
         }}
       >
-        <Ionicons name="speedometer-outline" size={20} color="#6b7280" />
-        <Text style={{ fontSize: 16, color: '#111827' }}>Units</Text>
+        <Ionicons
+          name="speedometer-outline"
+          size={20}
+          color={colors.textSecondary}
+        />
+        <Text
+          style={{
+            fontFamily: fontFamily.regular,
+            fontSize: fontSize.bodyLarge,
+            lineHeight: lineHeight.bodyLarge,
+            color: colors.textPrimary,
+          }}
+        >
+          Units
+        </Text>
       </View>
       <UnitToggle />
     </View>

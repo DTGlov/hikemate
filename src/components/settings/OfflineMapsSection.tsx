@@ -86,15 +86,22 @@ export function OfflineMapsSection(): React.JSX.Element {
       {regions.length === 0 ? (
         <View
           style={{
-            paddingVertical: 16,
+            paddingVertical: 24,
             alignItems: 'center',
-            gap: 6,
+            gap: 12,
           }}
         >
-          <Ionicons name="map-outline" size={28} color="#9ca3af" />
-          <Text style={{ fontSize: 13, color: '#6b7280' }}>
-            No offline regions yet.
-          </Text>
+          <Ionicons name="download-outline" size={32} color="#9ca3af" />
+          <View style={{ alignItems: 'center', gap: 4 }}>
+            <Text style={{ fontSize: 14, fontWeight: '500', color: '#111827' }}>
+              No offline regions yet
+            </Text>
+            <Text
+              style={{ fontSize: 12, color: '#6b7280', textAlign: 'center' }}
+            >
+              Download a region to use HikeMate without internet.
+            </Text>
+          </View>
         </View>
       ) : (
         regions.map((region) => (

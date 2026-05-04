@@ -76,7 +76,7 @@ function LockScreen(): React.JSX.Element {
           <Ionicons name={iconName} size={44} color="#0f766e" />
         </View>
         <View className="items-center gap-1">
-          <Text className="text-2xl font-bold text-gray-900">
+          <Text className="font-bold text-2xl text-gray-900">
             HikeMate is locked
           </Text>
           <Text className="text-center text-base text-gray-600">

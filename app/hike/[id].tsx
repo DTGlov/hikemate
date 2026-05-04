@@ -250,11 +250,11 @@ function HikeDetail({
                   autoFocus
                   placeholder="Untitled hike"
                   placeholderTextColor="#9ca3af"
-                  className="h-12 rounded-xl border border-gray-300 px-3 text-xl font-bold text-gray-900"
+                  className="h-12 rounded-xl border border-gray-300 px-3 font-bold text-xl text-gray-900"
                 />
               ) : (
                 <Pressable onPress={() => setIsEditingName(true)}>
-                  <Text className="text-2xl font-bold text-gray-900">
+                  <Text className="font-bold text-2xl text-gray-900">
                     {hike.name ?? `Hike on ${format(startedAt, 'PP')}`}
                   </Text>
                   <Text className="mt-1 text-sm text-gray-500">
