@@ -2,23 +2,20 @@ import { Ionicons } from '@expo/vector-icons';
 import type { Camera } from '@rnmapbox/maps';
 import * as Haptics from 'expo-haptics';
 import { Pressable, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBottomSheetOffset } from '@/hooks/useBottomSheetOffset';
 import { useLocationStore } from '@/stores/useLocationStore';
 
 type Props = {
   cameraRef: React.RefObject<Camera | null>;
 };
 
-// Approximate height of the bottom tab bar. Mapbox MapView is full-screen
-// (no SafeAreaView wrapping) so we manually clear the tab bar here.
-const TAB_BAR_OFFSET = 72;
-
 export function RecenterButton({ cameraRef }: Props): React.JSX.Element | null {
   const isFollowingUser = useLocationStore((s) => s.isFollowingUser);
   const currentLocation = useLocationStore((s) => s.currentLocation);
   const setFollowingUser = useLocationStore((s) => s.setFollowingUser);
-  const insets = useSafeAreaInsets();
+  // Clears the tab bar when solo and the crew sheet's peek when in crew.
+  const bottomOffset = useBottomSheetOffset();
 
   if (isFollowingUser) return null;
 
@@ -39,7 +36,7 @@ export function RecenterButton({ cameraRef }: Props): React.JSX.Element | null {
       style={{
         position: 'absolute',
         right: 16,
-        bottom: insets.bottom + TAB_BAR_OFFSET,
+        bottom: bottomOffset,
       }}
     >
       <Pressable

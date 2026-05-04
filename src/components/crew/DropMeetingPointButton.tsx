@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Pressable, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const TAB_BAR_OFFSET = 72;
+import { useBottomSheetOffset } from '@/hooks/useBottomSheetOffset';
+
+// Stack distance above the recenter button on the right edge.
 const RECENTER_BUTTON_OFFSET = 64;
 
 type Props = {
@@ -19,7 +20,8 @@ export function DropMeetingPointButton({
   hasExistingPin,
   onPress,
 }: Props): React.JSX.Element {
-  const insets = useSafeAreaInsets();
+  // Stacks above RecenterButton, which itself uses the same hook.
+  const recenterBottom = useBottomSheetOffset();
 
   const handlePress = (): void => {
     void Haptics.selectionAsync().catch(() => undefined);
@@ -32,7 +34,7 @@ export function DropMeetingPointButton({
       style={{
         position: 'absolute',
         right: 16,
-        bottom: insets.bottom + TAB_BAR_OFFSET + RECENTER_BUTTON_OFFSET,
+        bottom: recenterBottom + RECENTER_BUTTON_OFFSET,
       }}
     >
       <Pressable

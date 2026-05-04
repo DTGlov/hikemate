@@ -1,16 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { Pressable, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const TAB_BAR_OFFSET = 72;
+import { useBottomSheetOffset } from '@/hooks/useBottomSheetOffset';
 
 type Props = {
   onPress: () => void;
 };
 
 export function StartHikeButton({ onPress }: Props): React.JSX.Element {
-  const insets = useSafeAreaInsets();
+  // Lifts the button above the crew bottom sheet's peek when in a crew.
+  // Falls back to the historical insets+tab-bar baseline when solo.
+  const bottomOffset = useBottomSheetOffset();
 
   const handlePress = (): void => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(
@@ -26,7 +27,7 @@ export function StartHikeButton({ onPress }: Props): React.JSX.Element {
         position: 'absolute',
         left: 0,
         right: 0,
-        bottom: insets.bottom + TAB_BAR_OFFSET,
+        bottom: bottomOffset,
         alignItems: 'center',
       }}
     >

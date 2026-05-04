@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useBottomSheetOffset } from '@/hooks/useBottomSheetOffset';
 import {
   formatDistance,
   formatDuration,
@@ -12,8 +13,6 @@ import {
 } from '@/lib/units';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useProfileStore } from '@/stores/useProfileStore';
-
-const TAB_BAR_OFFSET = 72;
 
 type Props = {
   onStop: () => void;
@@ -43,6 +42,9 @@ export function ActiveHikeOverlay({
   backgroundDisabled,
 }: Props): React.JSX.Element {
   const insets = useSafeAreaInsets();
+  // Lifts the bottom Pause/Stop row above the crew sheet's peek when
+  // in a crew; falls back to the historical baseline when solo.
+  const bottomOffset = useBottomSheetOffset();
   const status = useHikeTrackingStore((s) => s.status);
   const stats = useHikeTrackingStore((s) => s.stats);
   const startedAt = useHikeTrackingStore((s) => s.startedAt);
@@ -142,7 +144,7 @@ export function ActiveHikeOverlay({
           position: 'absolute',
           left: 0,
           right: 0,
-          bottom: insets.bottom + TAB_BAR_OFFSET,
+          bottom: bottomOffset,
           flexDirection: 'row',
           justifyContent: 'center',
           gap: 12,
