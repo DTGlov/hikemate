@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -8,6 +9,7 @@ import { useHikes } from '@/hooks/useHikes';
 
 export default function HikesScreen(): React.JSX.Element {
   const { hikes, isLoading, error, refresh } = useHikes();
+  const router = useRouter();
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
@@ -35,7 +37,12 @@ export default function HikesScreen(): React.JSX.Element {
             paddingBottom: 32,
             gap: 12,
           }}
-          renderItem={({ item }) => <HikeListItem hike={item} />}
+          renderItem={({ item }) => (
+            <HikeListItem
+              hike={item}
+              onPress={() => router.push(`/hike/${item.id}`)}
+            />
+          )}
           refreshControl={
             <RefreshControl
               refreshing={isLoading}
