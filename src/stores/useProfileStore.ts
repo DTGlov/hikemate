@@ -22,6 +22,7 @@ type ProfileState = {
   loadProfile: (userId: string) => Promise<void>;
   updateUnitSystem: (next: UnitSystem) => Promise<void>;
   updateDisplayName: (next: string) => Promise<{ error: string | null }>;
+  updateAvatarSeed: (next: string) => Promise<{ error: string | null }>;
   reset: () => void;
 };
 
@@ -69,6 +70,21 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     const { error } = await supabase
       .from('profiles')
       .update({ display_name: trimmed })
+      .eq('id', current.id);
+    if (error) {
+      set({ profile: current });
+      return { error: error.message };
+    }
+    return { error: null };
+  },
+
+  updateAvatarSeed: async (next: string): Promise<{ error: string | null }> => {
+    const current = get().profile;
+    if (!current) return { error: 'No profile loaded' };
+    set({ profile: { ...current, avatar_seed: next } });
+    const { error } = await supabase
+      .from('profiles')
+      .update({ avatar_seed: next })
       .eq('id', current.id);
     if (error) {
       set({ profile: current });

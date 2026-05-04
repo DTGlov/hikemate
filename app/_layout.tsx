@@ -318,10 +318,6 @@ export default function RootLayout(): React.JSX.Element {
               options={{ headerShown: true, title: '' }}
             />
             <Stack.Screen
-              name="settings"
-              options={{ headerShown: true, title: 'Settings' }}
-            />
-            <Stack.Screen
               name="crew-summary/[roomId]"
               options={{ headerShown: true, title: 'Crew summary' }}
             />

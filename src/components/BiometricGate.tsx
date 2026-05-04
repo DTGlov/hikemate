@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
 import { useBiometricLock } from '@/hooks/useBiometricLock';
+import { useBiometricLockPref } from '@/hooks/useBiometricLockPref';
 import { useAuthStore } from '@/stores/useAuthStore';
 
 const GRACE_PERIOD_MS = 10_000;
@@ -22,6 +23,8 @@ export function BiometricGate({ children }: Props): React.JSX.Element {
   const setBiometricUnlocked = useAuthStore(
     (state) => state.setBiometricUnlocked,
   );
+  const { isEnabled: lockPrefEnabled, isLoading: lockPrefLoading } =
+    useBiometricLockPref();
 
   // Grace period: if the user unlocked recently and we're being asked to
   // re-evaluate (e.g. AppState fired 'background' on a swipe-then-return),
@@ -40,7 +43,14 @@ export function BiometricGate({ children }: Props): React.JSX.Element {
     }
   }, [session, isBiometricUnlocked, lastUnlockedAt, setBiometricUnlocked]);
 
-  if (!session || isBiometricUnlocked) {
+  // While the pref is loading, render a blank surface to avoid flashing
+  // either the lock screen or the unlocked app before we know which is
+  // correct. SecureStore reads typically finish in tens of milliseconds.
+  if (lockPrefLoading) {
+    return <View className="flex-1 bg-white" />;
+  }
+
+  if (!session || isBiometricUnlocked || !lockPrefEnabled) {
     return <>{children}</>;
   }
   return <LockScreen />;
