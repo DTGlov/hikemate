@@ -16,7 +16,18 @@ import { useProfileStore } from '@/stores/useProfileStore';
 import type { MemberLivePosition, CrewMember } from '@/types/crew';
 import type { HikeStats } from '@/types/hike';
 
-const SNAP_POINTS: string[] = ['22%', '55%', '92%'];
+/**
+ * The first ("peek") snap point as a fraction of screen height.
+ * Exported so on-map controls (Start Hike / Pause / Stop) can compute
+ * a bottom offset that keeps them above the sheet at peek without
+ * duplicating the magic number.
+ */
+export const CREW_SHEET_PEEK_PERCENT = 0.22;
+const SNAP_POINTS: string[] = [
+  `${Math.round(CREW_SHEET_PEEK_PERCENT * 100)}%`,
+  '55%',
+  '92%',
+];
 const COPIED_INDICATOR_MS = 1500;
 
 const COLOR = {
