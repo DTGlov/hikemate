@@ -1,6 +1,11 @@
 import { create } from 'zustand';
 
-import { boundingBox, currentPaceSecPerKm, haversineMeters } from '@/lib/geo';
+import {
+  boundingBox,
+  currentPaceSecPerKm,
+  haversineMeters,
+  pathDistanceMeters,
+} from '@/lib/geo';
 import type {
   BoundingBox,
   HikePoint,
@@ -9,6 +14,41 @@ import type {
 } from '@/types/hike';
 
 const ELEVATION_NOISE_FLOOR_M = 3;
+
+type PersistedHike = {
+  startedAt: number;
+  pausedAt: number | null;
+  accumulatedPausedMs: number;
+  points: HikePoint[];
+};
+
+/**
+ * Walk a path computing gain/loss + the "running reference altitude" for
+ * the smoothed elevation algorithm. Used when hydrating from persistence
+ * — addPoint maintains these incrementally on the hot path.
+ */
+function recomputeElevation(points: HikePoint[]): {
+  gain: number;
+  loss: number;
+  referenceAltitude: number | null;
+} {
+  let gain = 0;
+  let loss = 0;
+  let referenceAltitude: number | null = null;
+  for (const p of points) {
+    if (p.altitude === null) continue;
+    if (referenceAltitude === null) {
+      referenceAltitude = p.altitude;
+      continue;
+    }
+    const delta = p.altitude - referenceAltitude;
+    if (Math.abs(delta) < ELEVATION_NOISE_FLOOR_M) continue;
+    if (delta > 0) gain += delta;
+    else loss += -delta;
+    referenceAltitude = p.altitude;
+  }
+  return { gain, loss, referenceAltitude };
+}
 
 type DraftHike = {
   startedAtMs: number;
@@ -38,6 +78,8 @@ type HikeTrackingState = {
   finalizeHike: () => DraftHike | null;
   markSaving: () => void;
   resetHike: () => void;
+  restoreFromPersistence: (data: PersistedHike) => void;
+  mergePersistedPoints: (points: HikePoint[]) => void;
 };
 
 const EMPTY_STATS: HikeStats = {
@@ -161,6 +203,52 @@ export const useHikeTrackingStore = create<HikeTrackingState>((set, get) => ({
       accumulatedPausedMs: 0,
       stats: EMPTY_STATS,
       referenceAltitude: null,
+    });
+  },
+
+  restoreFromPersistence: (data: PersistedHike): void => {
+    const elevation = recomputeElevation(data.points);
+    const distanceMeters = pathDistanceMeters(data.points);
+    const isPaused = data.pausedAt !== null;
+    const liveDurationMs = isPaused
+      ? (data.pausedAt as number) - data.startedAt - data.accumulatedPausedMs
+      : Date.now() - data.startedAt - data.accumulatedPausedMs;
+    set({
+      status: isPaused ? 'paused' : 'tracking',
+      points: data.points,
+      startedAt: data.startedAt,
+      pausedAt: data.pausedAt,
+      accumulatedPausedMs: data.accumulatedPausedMs,
+      referenceAltitude: elevation.referenceAltitude,
+      stats: {
+        distanceMeters,
+        durationSeconds: Math.max(0, liveDurationMs / 1000),
+        elevationGainMeters: elevation.gain,
+        elevationLossMeters: elevation.loss,
+        currentPaceSecPerKm: currentPaceSecPerKm(data.points),
+      },
+    });
+  },
+
+  mergePersistedPoints: (points: HikePoint[]): void => {
+    const state = get();
+    if (state.startedAt === null) return;
+    if (points.length <= state.points.length) return;
+    const elevation = recomputeElevation(points);
+    const distanceMeters = pathDistanceMeters(points);
+    const last = points[points.length - 1];
+    const durationSeconds =
+      (last.timestamp - state.startedAt - state.accumulatedPausedMs) / 1000;
+    set({
+      points,
+      referenceAltitude: elevation.referenceAltitude,
+      stats: {
+        distanceMeters,
+        durationSeconds: Math.max(0, durationSeconds),
+        elevationGainMeters: elevation.gain,
+        elevationLossMeters: elevation.loss,
+        currentPaceSecPerKm: currentPaceSecPerKm(points),
+      },
     });
   },
 }));

@@ -5,6 +5,13 @@ import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Alert, AppState, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+// Side-effect import: registers the TaskManager task at module load so the
+// OS can wake JS for background location events even on cold launches.
+import '@/lib/backgroundLocationTask';
+
+import { BackgroundTrackingBanner } from '@/components/hike/BackgroundTrackingBanner';
+import { useHikeLifecycle } from '@/hooks/useHikeLifecycle';
+import { clearInProgressHike } from '@/lib/hikePersistence';
 import { ActiveRoomBanner } from '@/components/room/ActiveRoomBanner';
 import { useRoom, joinRoom, leaveRoom } from '@/hooks/useRoom';
 import { useRoomBroadcast } from '@/hooks/useRoomBroadcast';
@@ -21,6 +28,7 @@ import { initMapbox } from '@/lib/mapbox';
 import { isValidRoomCode } from '@/lib/roomCode';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
 import { useProfileStore } from '@/stores/useProfileStore';
 import type { HikeRoom } from '@/types/room';
@@ -93,6 +101,15 @@ export default function RootLayout(): React.JSX.Element {
   const router = useRouter();
   const segments = useSegments();
 
+  // Owns the background-tracking lifecycle (subscription, persistence,
+  // hydration, polling). Mounted at root so it survives screen navigation.
+  useHikeLifecycle();
+
+  // Load the user's profile whenever the active user changes; reset on
+  // logout so we don't show stale data to the next user on this device.
+  // Also drop any in-progress hike on logout — we don't want one user's
+  // captured points carrying over into another user's account on shared
+  // devices.
   // Wire the realtime channel for the currently-joined room (no-op if none).
   // The channel itself is published into useRoomStore by useRoom; broadcast
   // reads it from there so a single store update wakes all subscribers.
@@ -109,6 +126,8 @@ export default function RootLayout(): React.JSX.Element {
       void loadProfile(userId);
     } else {
       resetProfile();
+      useHikeTrackingStore.getState().resetHike();
+      void clearInProgressHike();
       void leaveRoom();
       void clearActiveRoomId();
       restoredRef.current = false;
@@ -253,7 +272,7 @@ export default function RootLayout(): React.JSX.Element {
   }
 
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
+<GestureHandlerRootView style={{ flex: 1 }}>
       <BottomSheetModalProvider>
         <View className="flex-1">
           <Stack screenOptions={{ headerShown: false }}>
@@ -268,6 +287,7 @@ export default function RootLayout(): React.JSX.Element {
               options={{ headerShown: true, title: 'Settings' }}
             />
           </Stack>
+          <BackgroundTrackingBanner />
           <ActiveRoomBanner />
         </View>
       </BottomSheetModalProvider>
