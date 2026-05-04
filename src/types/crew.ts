@@ -47,6 +47,10 @@ export interface CrewMember {
   user_id: string;
   display_name: string;
   color: string;
+  /** Snapshot of profiles.avatar_seed at join time. Nullable for rows
+   *  written by older clients before Phase 6.8; the Avatar component
+   *  falls back to the colored initials circle in that case. */
+  avatar_seed: string | null;
   joined_at: string;
   last_known_lat: number | null;
   last_known_lng: number | null;

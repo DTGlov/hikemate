@@ -35,6 +35,16 @@ type CrewState = {
   // trigger reconciliation and React 18 batching can swallow the
   // surrounding setState calls used to "wake" subscribers.
   channel: RealtimeChannel | null;
+  // Phase 6.8 — frozen snapshot of the most recently ended/left crew, used
+  // to drive the Crew End Summary screen after live state has been
+  // cleared. Set just before clearCrew runs; cleared by the summary
+  // screen's Done button.
+  lastEndedCrew: {
+    crew: HikeCrew;
+    members: Record<string, CrewMember>;
+    liveStats: Record<string, HikeStats>;
+    endedAt: string;
+  } | null;
 
   setCrew: (crew: HikeCrew, members: CrewMember[], myUserId: string) => void;
   upsertMember: (member: CrewMember) => void;
@@ -45,6 +55,10 @@ type CrewState = {
   setChannel: (channel: RealtimeChannel | null) => void;
   clearChannel: () => void;
   clearCrew: () => void;
+  // Phase 6.8 — capture current live state into lastEndedCrew so the
+  // summary screen can render after clearCrew wipes the live slots.
+  snapshotForSummary: () => void;
+  clearLastEndedCrew: () => void;
 
   // Phase 7 — meeting point + arrivals.
   setMeetingPointLocal: (next: MeetingPoint | null) => void;
@@ -99,6 +113,7 @@ export const useCrewStore = create<CrewState>((set, get) => ({
   arrivals: {},
   isHost: false,
   channel: null,
+  lastEndedCrew: null,
 
   setChannel: (channel): void => set({ channel }),
   clearChannel: (): void => set({ channel: null }),
@@ -233,6 +248,23 @@ export const useCrewStore = create<CrewState>((set, get) => ({
       isHost: false,
       channel: null,
     });
+  },
+
+  snapshotForSummary: (): void => {
+    const state = get();
+    if (!state.crew) return;
+    set({
+      lastEndedCrew: {
+        crew: state.crew,
+        members: state.members,
+        liveStats: state.liveStats,
+        endedAt: new Date().toISOString(),
+      },
+    });
+  },
+
+  clearLastEndedCrew: (): void => {
+    set({ lastEndedCrew: null });
   },
 
   setMeetingPointLocal: (next): void => {

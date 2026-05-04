@@ -7,9 +7,11 @@ import {
   View,
 } from 'react-native';
 
+import { Avatar } from '@/components/avatar/Avatar';
 import { Button } from '@/components/Button';
 import { OfflineMapsSection } from '@/components/settings/OfflineMapsSection';
 import { UnitToggle } from '@/components/settings/UnitToggle';
+import { colorForUser } from '@/lib/memberColor';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProfileStore } from '@/stores/useProfileStore';
 
@@ -61,9 +63,17 @@ export default function SettingsScreen(): React.JSX.Element {
       contentContainerStyle={{ padding: 24, gap: 28 }}
     >
       <Section title="Profile">
-        <View className="gap-1.5">
-          <Text className="text-sm font-medium text-gray-700">Email</Text>
-          <Text className="text-base text-gray-900">{userEmail ?? '—'}</Text>
+        <View className="flex-row items-center gap-3">
+          <Avatar
+            seed={profile?.avatar_seed ?? null}
+            displayName={profile?.display_name ?? userEmail ?? 'Hiker'}
+            fallbackColor={profile ? colorForUser(profile.id) : '#0f766e'}
+            size={56}
+          />
+          <View className="flex-1 gap-0.5">
+            <Text className="text-sm font-medium text-gray-700">Email</Text>
+            <Text className="text-base text-gray-900">{userEmail ?? '—'}</Text>
+          </View>
         </View>
         <View className="gap-1.5">
           <View className="flex-row items-center justify-between">

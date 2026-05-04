@@ -35,6 +35,7 @@ import { initMapbox } from '@/lib/mapbox';
 import { isValidCrewCode } from '@/lib/crewCode';
 import { supabase } from '@/lib/supabase';
 import { useAuthStore } from '@/stores/useAuthStore';
+import { useCrewStore } from '@/stores/useCrewStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
 import { useProfileStore } from '@/stores/useProfileStore';
@@ -63,8 +64,9 @@ async function joinCrewByCode(params: {
   code: string;
   userId: string;
   displayName: string;
+  avatarSeed: string;
 }): Promise<{ error: string | null }> {
-  const { code, userId, displayName } = params;
+  const { code, userId, displayName, avatarSeed } = params;
   const { data: crewRow, error: lookupError } = await supabase
     .from('hike_rooms')
     .select('*')
@@ -82,6 +84,7 @@ async function joinCrewByCode(params: {
     userId,
     displayName,
     color: colorForUser(userId),
+    avatarSeed,
   });
 }
 
@@ -176,11 +179,13 @@ export default function RootLayout(): React.JSX.Element {
           : userEmail
             ? emailToDisplayName(userEmail)
             : 'Hiker';
+      const profile = useProfileStore.getState().profile;
       const { error: joinError } = await joinCrew({
         crewId: crew.id,
         userId,
         displayName,
         color: colorForUser(userId),
+        avatarSeed: profile?.avatar_seed ?? userId,
       });
       if (joinError) await clearActiveCrewId();
     })();
@@ -199,10 +204,12 @@ export default function RootLayout(): React.JSX.Element {
           : userEmail
             ? emailToDisplayName(userEmail)
             : 'Hiker';
+      const profile = useProfileStore.getState().profile;
       const { error } = await joinCrewByCode({
         code: pending,
         userId,
         displayName,
+        avatarSeed: profile?.avatar_seed ?? userId,
       });
       if (error) Alert.alert('Could not join crew', error);
     })();
@@ -234,6 +241,7 @@ export default function RootLayout(): React.JSX.Element {
         code,
         userId: currentUserId,
         displayName,
+        avatarSeed: profile?.avatar_seed ?? currentUserId,
       });
       if (error) Alert.alert('Could not join crew', error);
     };
@@ -273,6 +281,21 @@ export default function RootLayout(): React.JSX.Element {
     }
   }, [isLoading, session, segments, router]);
 
+  // Phase 6.8 — when a snapshot of an ended crew appears, route to the
+  // summary screen. The screen clears the snapshot on Done, which is
+  // also the unique signal that lets us navigate (avoiding a loop).
+  const lastEndedCrew = useCrewStore((state) => state.lastEndedCrew);
+  const lastNavigatedIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!lastEndedCrew) {
+      lastNavigatedIdRef.current = null;
+      return;
+    }
+    if (lastNavigatedIdRef.current === lastEndedCrew.crew.id) return;
+    lastNavigatedIdRef.current = lastEndedCrew.crew.id;
+    router.push(`/crew-summary/${lastEndedCrew.crew.id}`);
+  }, [lastEndedCrew, router]);
+
   if (isLoading) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
@@ -297,6 +320,10 @@ export default function RootLayout(): React.JSX.Element {
             <Stack.Screen
               name="settings"
               options={{ headerShown: true, title: 'Settings' }}
+            />
+            <Stack.Screen
+              name="crew-summary/[roomId]"
+              options={{ headerShown: true, title: 'Crew summary' }}
             />
           </Stack>
           <BackgroundTrackingBanner />

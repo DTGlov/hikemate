@@ -2,8 +2,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { formatDistanceToNow } from 'date-fns';
 import { Pressable, Text, View } from 'react-native';
 
+import { Avatar } from '@/components/avatar/Avatar';
 import { haversineMeters } from '@/lib/geo';
-import { initialsFromDisplayName } from '@/lib/displayName';
 import {
   formatDistance,
   formatDuration,
@@ -55,29 +55,7 @@ export function MemberDetailCard({
       }}
     >
       <View className="rounded-2xl bg-white p-4 shadow-lg">
-        <View className="flex-row items-center gap-3">
-          <View
-            style={{
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: member.color,
-              alignItems: 'center',
-              justifyContent: 'center',
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '700' }}>
-              {initialsFromDisplayName(member.display_name)}
-            </Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-base font-semibold text-gray-900">
-              {member.display_name}
-            </Text>
-            <Text className="text-xs text-gray-500">
-              {distanceText} away • {lastSeenText}
-            </Text>
-          </View>
+        <View className="flex-row justify-end">
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Close member details"
@@ -86,6 +64,21 @@ export function MemberDetailCard({
           >
             <Ionicons name="close" size={18} color="#374151" />
           </Pressable>
+        </View>
+        <View className="items-center gap-2">
+          <Avatar
+            seed={member.avatar_seed}
+            displayName={member.display_name}
+            fallbackColor={member.color}
+            size={80}
+            ringColor={member.color}
+          />
+          <Text className="text-lg font-semibold text-gray-900">
+            {member.display_name}
+          </Text>
+          <Text className="text-xs text-gray-500">
+            {distanceText} away • {lastSeenText}
+          </Text>
         </View>
 
         {stats ? (

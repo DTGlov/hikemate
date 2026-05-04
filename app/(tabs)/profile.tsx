@@ -3,7 +3,9 @@ import { Link } from 'expo-router';
 import { Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { Avatar } from '@/components/avatar/Avatar';
 import { useHikes } from '@/hooks/useHikes';
+import { colorForUser } from '@/lib/memberColor';
 import { formatDistance } from '@/lib/units';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProfileStore } from '@/stores/useProfileStore';
@@ -22,11 +24,14 @@ export default function ProfileScreen(): React.JSX.Element {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
       <View className="flex-1 gap-6 px-6 pt-2">
-        <View className="flex-row items-center gap-4">
-          <View className="h-16 w-16 items-center justify-center rounded-full bg-teal-50">
-            <Ionicons name="person" size={32} color="#0f766e" />
-          </View>
-          <View className="flex-1 gap-0.5">
+        <View className="items-center gap-3">
+          <Avatar
+            seed={profile?.avatar_seed ?? null}
+            displayName={displayName}
+            fallbackColor={profile ? colorForUser(profile.id) : '#0f766e'}
+            size={96}
+          />
+          <View className="items-center gap-0.5">
             <Text className="text-xl font-bold text-gray-900" numberOfLines={1}>
               {displayName}
             </Text>

@@ -37,6 +37,9 @@ export function JoinCrewSheet({
   const userId = useAuthStore((s) => s.user?.id ?? null);
   const userEmail = useAuthStore((s) => s.user?.email ?? null);
   const profileName = useProfileStore((s) => s.profile?.display_name ?? null);
+  const profileAvatarSeed = useProfileStore(
+    (s) => s.profile?.avatar_seed ?? null,
+  );
 
   const [code, setCode] = useState('');
   const [isJoining, setIsJoining] = useState(false);
@@ -105,6 +108,7 @@ export function JoinCrewSheet({
       userId,
       displayName,
       color: colorForUser(userId),
+      avatarSeed: profileAvatarSeed ?? userId,
     });
     setIsJoining(false);
     if (joinError) {
