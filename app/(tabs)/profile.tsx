@@ -253,10 +253,10 @@ function Hero({
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
-          gap: 6,
-          paddingHorizontal: 6,
-          paddingVertical: 2,
-          borderRadius: 6,
+          gap: 10,
+          paddingHorizontal: 10,
+          paddingVertical: 4,
+          borderRadius: 8,
           backgroundColor: pressed ? '#f3f4f6' : 'transparent',
         })}
       >
@@ -266,7 +266,7 @@ function Hero({
         >
           {displayName}
         </Text>
-        <Ionicons name="pencil-outline" size={16} color="#6b7280" />
+        <Ionicons name="pencil-outline" size={18} color="#6b7280" />
       </Pressable>
 
       {!hintHidden ? (
