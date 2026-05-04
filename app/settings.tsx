@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 
 import { Button } from '@/components/Button';
+import { OfflineMapsSection } from '@/components/settings/OfflineMapsSection';
 import { UnitToggle } from '@/components/settings/UnitToggle';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useProfileStore } from '@/stores/useProfileStore';
@@ -97,6 +98,10 @@ export default function SettingsScreen(): React.JSX.Element {
           <Text className="text-sm font-medium text-gray-700">Units</Text>
           <UnitToggle />
         </View>
+      </Section>
+
+      <Section title="Offline Maps">
+        <OfflineMapsSection />
       </Section>
 
       <Section title="Account">

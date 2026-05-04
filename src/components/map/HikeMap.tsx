@@ -29,6 +29,7 @@ import { CrewMembersBottomSheet } from '@/components/crew/CrewMembersBottomSheet
 import { DropMeetingPointButton } from '@/components/crew/DropMeetingPointButton';
 import { DropMeetingPointHint } from '@/components/crew/DropMeetingPointHint';
 import { JoinCrewSheet } from '@/components/crew/JoinCrewSheet';
+import { ConnectionLostBanner } from '@/components/offline/ConnectionLostBanner';
 import { MeetingPointGeofenceLayer } from '@/components/crew/MeetingPointGeofenceLayer';
 import { MeetingPointPin } from '@/components/crew/MeetingPointPin';
 import { MemberDetailCard } from '@/components/crew/MemberDetailCard';
@@ -36,6 +37,7 @@ import { useAlwaysPermission } from '@/hooks/useAlwaysPermission';
 import { useBackgroundHikeTracker } from '@/hooks/useBackgroundHikeTracker';
 import { useUserLocation } from '@/hooks/useUserLocation';
 import { useCrewStore } from '@/stores/useCrewStore';
+import { useOfflineStore } from '@/stores/useOfflineStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
 import { useLocationStore } from '@/stores/useLocationStore';
 
@@ -74,6 +76,7 @@ export function HikeMap(): React.JSX.Element {
   const isHost = useCrewStore((s) => s.isHost);
   const setMeetingPointRemote = useCrewStore((s) => s.setMeetingPointRemote);
   const inCrew = crew !== null;
+  const isOnline = useOfflineStore((s) => s.isOnline);
 
   const cameraRef = useRef<Camera>(null);
   const [stopModalVisible, setStopModalVisible] = useState(false);
@@ -340,6 +343,10 @@ export function HikeMap(): React.JSX.Element {
       alwaysStatus !== 'always' ? (
         <AlwaysPermissionBanner />
       ) : null}
+
+      {/* Phase 7.5 — connection lost. Only on the home tab and only
+          when in a crew (members' dots are stale without realtime). */}
+      {inCrew && !isOnline ? <ConnectionLostBanner /> : null}
 
       <AlwaysPermissionExplainer
         visible={explainerVisible}
