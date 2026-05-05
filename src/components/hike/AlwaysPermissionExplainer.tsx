@@ -43,7 +43,7 @@ export function AlwaysPermissionExplainer({
             <View className="h-20 w-20 items-center justify-center rounded-full bg-teal-50">
               <Ionicons name="lock-closed-outline" size={44} color="#0f766e" />
             </View>
-            <Text className="text-center text-2xl font-bold text-gray-900">
+            <Text className="text-center font-bold text-2xl text-gray-900">
               Keep tracking when your phone is locked
             </Text>
             <Text className="text-center text-base leading-6 text-gray-600">

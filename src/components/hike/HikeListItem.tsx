@@ -4,6 +4,14 @@ import * as Haptics from 'expo-haptics';
 import { Image, Pressable, Text, View } from 'react-native';
 
 import { getHikeThumbnailUrl } from '@/lib/mapbox';
+import {
+  colors,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  radius,
+  spacing,
+} from '@/lib/theme';
 import { formatDistance, formatDuration } from '@/lib/units';
 import { useProfileStore } from '@/stores/useProfileStore';
 import type { SavedHike } from '@/types/hike';
@@ -31,10 +39,14 @@ export function HikeListItem({ hike, onPress }: Props): React.JSX.Element {
       style={({ pressed }) => ({
         opacity: pressed ? 0.85 : 1,
         transform: [{ scale: pressed ? 0.99 : 1 }],
+        overflow: 'hidden',
+        borderRadius: radius.md,
+        borderWidth: 1,
+        borderColor: colors.border,
+        backgroundColor: colors.surface,
       })}
-      className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
     >
-      <View className="h-32 bg-gray-100">
+      <View style={{ height: 128, backgroundColor: colors.surfaceMuted }}>
         {thumbnailUrl ? (
           <Image
             source={{ uri: thumbnailUrl }}
@@ -44,18 +56,29 @@ export function HikeListItem({ hike, onPress }: Props): React.JSX.Element {
           />
         ) : (
           <View className="h-full w-full items-center justify-center">
-            <Ionicons name="map-outline" size={28} color="#9ca3af" />
+            <Ionicons name="map-outline" size={28} color={colors.textMuted} />
           </View>
         )}
       </View>
-      <View className="gap-1 p-4">
+      <View style={{ gap: spacing.xs, padding: spacing.base }}>
         <Text
-          className="text-base font-semibold text-gray-900"
+          style={{
+            fontFamily: fontFamily.medium,
+            fontSize: fontSize.bodyLarge,
+            lineHeight: lineHeight.bodyLarge,
+            color: colors.textPrimary,
+          }}
           numberOfLines={1}
         >
           {hike.name ?? `Hike on ${format(startedAt, 'PP')}`}
         </Text>
-        <View className="flex-row items-center gap-3">
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: spacing.md,
+          }}
+        >
           <Stat
             icon="footsteps-outline"
             text={formatDistance(hike.distance_meters, unitSystem)}
@@ -79,9 +102,24 @@ function Stat({
   text: string;
 }): React.JSX.Element {
   return (
-    <View className="flex-row items-center gap-1">
-      <Ionicons name={icon} size={14} color="#6b7280" />
-      <Text className="text-sm text-gray-600">{text}</Text>
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: spacing.xs,
+      }}
+    >
+      <Ionicons name={icon} size={14} color={colors.textSecondary} />
+      <Text
+        style={{
+          fontFamily: fontFamily.regular,
+          fontSize: fontSize.small,
+          lineHeight: lineHeight.small,
+          color: colors.textSecondary,
+        }}
+      >
+        {text}
+      </Text>
     </View>
   );
 }

@@ -45,7 +45,7 @@ export default function LoginScreen(): React.JSX.Element {
       >
         <View className="flex-1 justify-center gap-6 px-6">
           <View className="gap-1">
-            <Text className="text-3xl font-bold text-gray-900">
+            <Text className="font-bold text-3xl text-gray-900">
               Welcome back
             </Text>
             <Text className="text-base text-gray-600">

@@ -101,7 +101,7 @@ export function ActiveHikeOverlay({
         }}
       >
         <View className="rounded-2xl bg-white/95 p-4 shadow-lg">
-          <Text className="text-center text-5xl font-bold text-gray-900">
+          <Text className="text-center font-bold text-5xl text-gray-900">
             {formatDuration(liveDuration)}
           </Text>
           <Text className="mt-1 text-center text-sm text-gray-500">

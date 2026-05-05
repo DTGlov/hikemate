@@ -1,8 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 
-const HORIZONTAL_PADDING = 20;
-const ICON_GUTTER_GAP = 12;
+import { colors, fontFamily, fontSize, lineHeight, spacing } from '@/lib/theme';
+
+const HORIZONTAL_PADDING = spacing.lg;
+const ICON_GUTTER_GAP = spacing.md;
 
 type IoniconName = keyof typeof Ionicons.glyphMap;
 
@@ -38,8 +40,9 @@ export function ProfileRow({
   destructive = false,
   loading = false,
 }: Props): React.JSX.Element {
-  const labelColor = destructive ? '#dc2626' : '#111827';
-  const resolvedIconColor = iconColor ?? (destructive ? '#dc2626' : '#6b7280');
+  const labelColor = destructive ? colors.danger : colors.textPrimary;
+  const resolvedIconColor =
+    iconColor ?? (destructive ? colors.danger : colors.textSecondary);
 
   const content = (
     <View
@@ -50,7 +53,7 @@ export function ProfileRow({
         paddingHorizontal: HORIZONTAL_PADDING,
         gap: ICON_GUTTER_GAP,
         borderBottomWidth: 1,
-        borderBottomColor: '#f3f4f6',
+        borderBottomColor: colors.divider,
       }}
     >
       {icon ? (
@@ -59,9 +62,10 @@ export function ProfileRow({
       <Text
         style={{
           flex: 1,
-          fontSize: 16,
+          fontFamily: destructive ? fontFamily.medium : fontFamily.regular,
+          fontSize: fontSize.bodyLarge,
+          lineHeight: lineHeight.bodyLarge,
           color: labelColor,
-          fontWeight: destructive ? '500' : '400',
         }}
         numberOfLines={1}
       >
@@ -73,7 +77,13 @@ export function ProfileRow({
         control
       ) : value ? (
         <Text
-          style={{ fontSize: 16, color: '#6b7280', flexShrink: 1 }}
+          style={{
+            fontFamily: fontFamily.regular,
+            fontSize: fontSize.bodyLarge,
+            lineHeight: lineHeight.bodyLarge,
+            color: colors.textSecondary,
+            flexShrink: 1,
+          }}
           numberOfLines={1}
         >
           {value}
@@ -94,8 +104,8 @@ export function ProfileRow({
         backgroundColor: pressed
           ? destructive
             ? '#fef2f2'
-            : '#f9fafb'
-          : '#ffffff',
+            : colors.surfaceElevated
+          : colors.surface,
       })}
     >
       {content}

@@ -1,8 +1,15 @@
+import {
+  Geist_400Regular,
+  Geist_500Medium,
+  Geist_700Bold,
+  useFonts,
+} from '@expo-google-fonts/geist';
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as Linking from 'expo-linking';
+import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Alert, AppState, View } from 'react-native';
+import { ActivityIndicator, Alert, AppState, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Side-effect imports: register TaskManager tasks at module load so the
@@ -10,18 +17,16 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import '@/lib/backgroundLocationTask';
 import '@/lib/meetingPointTask';
 
-import { BackgroundTrackingBanner } from '@/components/hike/BackgroundTrackingBanner';
-import { useHikeLifecycle } from '@/hooks/useHikeLifecycle';
-import { clearInProgressHike } from '@/lib/hikePersistence';
 import { ActiveCrewBanner } from '@/components/crew/ActiveCrewBanner';
+import { BackgroundTrackingBanner } from '@/components/hike/BackgroundTrackingBanner';
 import { OutboxBanner } from '@/components/offline/OutboxBanner';
 import { useCrew, joinCrew, leaveCrew } from '@/hooks/useCrew';
 import { useCrewBroadcast } from '@/hooks/useCrewBroadcast';
 import { useCrewStatsBroadcast } from '@/hooks/useCrewStatsBroadcast';
+import { useHikeLifecycle } from '@/hooks/useHikeLifecycle';
 import { useHikeOutboxSync } from '@/hooks/useHikeOutboxSync';
 import { useMeetingPointGeofence } from '@/hooks/useMeetingPointGeofence';
 import { useOnlineState } from '@/hooks/useOnlineState';
-import { clearOutbox } from '@/lib/hikeOutbox';
 import {
   clearActiveCrewId,
   clearPendingCrewCode,
@@ -29,11 +34,14 @@ import {
   getPendingCrewCode,
   setPendingCrewCode,
 } from '@/lib/activeCrewPersistence';
-import { emailToDisplayName } from '@/lib/displayName';
-import { colorForUser } from '@/lib/memberColor';
-import { initMapbox } from '@/lib/mapbox';
 import { isValidCrewCode } from '@/lib/crewCode';
+import { emailToDisplayName } from '@/lib/displayName';
+import { clearOutbox } from '@/lib/hikeOutbox';
+import { clearInProgressHike } from '@/lib/hikePersistence';
+import { initMapbox } from '@/lib/mapbox';
+import { colorForUser } from '@/lib/memberColor';
 import { supabase } from '@/lib/supabase';
+import { fontFamily } from '@/lib/theme';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useCrewStore } from '@/stores/useCrewStore';
 import { useHikeTrackingStore } from '@/stores/useHikeTrackingStore';
@@ -42,6 +50,25 @@ import { useProfileStore } from '@/stores/useProfileStore';
 import type { HikeCrew } from '@/types/crew';
 
 import '../global.css';
+
+// Apply Geist as the default font for any bare <Text> across the app
+// without having to touch every call site. Tailwind's `font-sans` is
+// also pointed at Geist (see tailwind.config.js) so NativeWind class
+// usage resolves the same way.
+const TextWithDefaults = Text as unknown as {
+  defaultProps: { style?: { fontFamily: string } };
+};
+TextWithDefaults.defaultProps = TextWithDefaults.defaultProps ?? {
+  style: undefined,
+};
+TextWithDefaults.defaultProps.style = {
+  ...(TextWithDefaults.defaultProps.style ?? {}),
+  fontFamily: fontFamily.regular,
+};
+
+// Keep the native splash up until JS + fonts are ready. preventAutoHideAsync
+// is safe to call multiple times; failures are non-fatal (catch swallows).
+SplashScreen.preventAutoHideAsync().catch(() => undefined);
 
 function extractCrewCodeFromUrl(url: string): string | null {
   try {
@@ -89,6 +116,21 @@ async function joinCrewByCode(params: {
 }
 
 export default function RootLayout(): React.JSX.Element {
+  const [fontsLoaded] = useFonts({
+    Geist_400Regular,
+    Geist_500Medium,
+    Geist_700Bold,
+  });
+
+  // Hide the native splash once both auth and fonts have settled. Doing
+  // this in an effect (rather than during render) avoids the warning
+  // about hiding the splash before the first frame is committed.
+  useEffect(() => {
+    if (fontsLoaded) {
+      SplashScreen.hideAsync().catch(() => undefined);
+    }
+  }, [fontsLoaded]);
+
   const initialize = useAuthStore((state) => state.initialize);
   const isLoading = useAuthStore((state) => state.isLoading);
   const session = useAuthStore((state) => state.session);
@@ -296,11 +338,15 @@ export default function RootLayout(): React.JSX.Element {
     router.push(`/crew-summary/${lastEndedCrew.crew.id}`);
   }, [lastEndedCrew, router]);
 
-  if (isLoading) {
+  // Hold the app blank (under the still-visible native splash) until both
+  // auth has settled and Geist has loaded, so no system-font flash leaks.
+  if (isLoading || !fontsLoaded) {
     return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <View className="flex-1 items-center justify-center bg-white">
-          <ActivityIndicator size="large" color="#0f766e" />
+          {fontsLoaded ? (
+            <ActivityIndicator size="large" color="#0f766e" />
+          ) : null}
         </View>
       </GestureHandlerRootView>
     );

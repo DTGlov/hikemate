@@ -151,7 +151,7 @@ export function JoinCrewSheet({
 
           <View className="gap-5">
             <View className="gap-1">
-              <Text className="text-2xl font-bold text-gray-900">
+              <Text className="font-bold text-2xl text-gray-900">
                 Join a crew
               </Text>
               <Text className="text-sm text-gray-600">
@@ -175,7 +175,7 @@ export function JoinCrewSheet({
                             : 'border-gray-200 bg-gray-50'
                       }`}
                     >
-                      <Text className="text-2xl font-bold text-gray-900">
+                      <Text className="font-bold text-2xl text-gray-900">
                         {ch}
                       </Text>
                     </View>

@@ -4,8 +4,17 @@ import { FlatList, RefreshControl, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/Button';
+import { EmptyState } from '@/components/EmptyState';
 import { HikeListItem } from '@/components/hike/HikeListItem';
 import { useHikes } from '@/hooks/useHikes';
+import {
+  colors,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  radius,
+  spacing,
+} from '@/lib/theme';
 
 export default function HikesScreen(): React.JSX.Element {
   const { hikes, isLoading, error, refresh } = useHikes();
@@ -13,18 +22,63 @@ export default function HikesScreen(): React.JSX.Element {
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={['top']}>
-      <View className="px-6 pb-3 pt-2">
-        <Text className="text-3xl font-bold text-gray-900">Hikes</Text>
+      <View
+        style={{
+          paddingHorizontal: spacing.xl,
+          paddingTop: spacing.sm,
+          paddingBottom: spacing.md,
+        }}
+      >
+        <Text
+          style={{
+            fontFamily: fontFamily.bold,
+            fontSize: fontSize.heading2,
+            lineHeight: lineHeight.heading2,
+            color: colors.textPrimary,
+          }}
+        >
+          Hikes
+        </Text>
       </View>
 
       {error && hikes === null ? (
-        <View className="flex-1 items-center justify-center gap-4 px-8">
-          <Ionicons name="cloud-offline-outline" size={56} color="#9ca3af" />
-          <Text className="text-center text-base text-gray-700">
+        <View
+          style={{
+            flex: 1,
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: spacing.xxl,
+            gap: spacing.base,
+          }}
+        >
+          <Ionicons
+            name="cloud-offline-outline"
+            size={48}
+            color={colors.textMuted}
+          />
+          <Text
+            style={{
+              fontFamily: fontFamily.medium,
+              fontSize: fontSize.bodyLarge,
+              lineHeight: lineHeight.bodyLarge,
+              color: colors.textPrimary,
+              textAlign: 'center',
+            }}
+          >
             Couldn&apos;t load your hikes.
           </Text>
-          <Text className="text-center text-sm text-gray-500">{error}</Text>
-          <View className="w-full max-w-xs">
+          <Text
+            style={{
+              fontFamily: fontFamily.regular,
+              fontSize: fontSize.body,
+              lineHeight: lineHeight.body,
+              color: colors.textSecondary,
+              textAlign: 'center',
+            }}
+          >
+            {error}
+          </Text>
+          <View style={{ width: '100%', maxWidth: 320 }}>
             <Button label="Retry" onPress={() => void refresh()} />
           </View>
         </View>
@@ -33,9 +87,9 @@ export default function HikesScreen(): React.JSX.Element {
           data={hikes ?? []}
           keyExtractor={(item) => item.id}
           contentContainerStyle={{
-            paddingHorizontal: 16,
-            paddingBottom: 32,
-            gap: 12,
+            paddingHorizontal: spacing.base,
+            paddingBottom: spacing.xxl,
+            gap: spacing.md,
           }}
           renderItem={({ item }) => (
             <HikeListItem
@@ -59,16 +113,36 @@ export default function HikesScreen(): React.JSX.Element {
 
 function ListSkeleton(): React.JSX.Element {
   return (
-    <View className="gap-3 pt-2">
+    <View style={{ gap: spacing.md, paddingTop: spacing.sm }}>
       {[0, 1, 2].map((i) => (
         <View
           key={i}
-          className="overflow-hidden rounded-2xl border border-gray-200 bg-white"
+          style={{
+            overflow: 'hidden',
+            borderRadius: radius.md,
+            borderWidth: 1,
+            borderColor: colors.border,
+            backgroundColor: colors.surface,
+          }}
         >
-          <View className="h-32 bg-gray-100" />
-          <View className="gap-2 p-4">
-            <View className="h-4 w-1/2 rounded bg-gray-200" />
-            <View className="h-3 w-3/4 rounded bg-gray-100" />
+          <View style={{ height: 128, backgroundColor: colors.surfaceMuted }} />
+          <View style={{ gap: spacing.sm, padding: spacing.base }}>
+            <View
+              style={{
+                height: 14,
+                width: '50%',
+                borderRadius: 4,
+                backgroundColor: colors.divider,
+              }}
+            />
+            <View
+              style={{
+                height: 12,
+                width: '75%',
+                borderRadius: 4,
+                backgroundColor: colors.surfaceMuted,
+              }}
+            />
           </View>
         </View>
       ))}
@@ -78,19 +152,12 @@ function ListSkeleton(): React.JSX.Element {
 
 function EmptyHikes(): React.JSX.Element {
   return (
-    <View className="items-center gap-4 px-6 pt-24">
-      <View className="h-24 w-24 items-center justify-center rounded-full bg-teal-50">
-        <Ionicons name="trail-sign-outline" size={48} color="#0f766e" />
-      </View>
-      <View className="items-center gap-1">
-        <Text className="text-xl font-semibold text-gray-900">
-          No hikes yet
-        </Text>
-        <Text className="text-center text-base text-gray-600">
-          Your first hike will appear here once you finish tracking on the Home
-          tab.
-        </Text>
-      </View>
+    <View style={{ minHeight: 480 }}>
+      <EmptyState
+        icon="map-outline"
+        title="No hikes yet"
+        body="Tap Start Hike on the Home tab to begin your first adventure."
+      />
     </View>
   );
 }

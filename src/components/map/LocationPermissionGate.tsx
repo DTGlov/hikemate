@@ -65,7 +65,7 @@ export function LocationPermissionGate(): React.JSX.Element {
           <Ionicons name={copy.iconName} size={56} color="#0f766e" />
         </View>
         <View className="items-center gap-2">
-          <Text className="text-center text-2xl font-bold text-gray-900">
+          <Text className="text-center font-bold text-2xl text-gray-900">
             {copy.title}
           </Text>
           <Text className="text-center text-base leading-6 text-gray-600">

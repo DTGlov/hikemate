@@ -291,7 +291,7 @@ export function HikeMap(): React.JSX.Element {
         <View className="pointer-events-none absolute left-0 right-0 top-16 items-center">
           <View className="flex-row items-center gap-2 rounded-full bg-white/95 px-4 py-2 shadow">
             <ActivityIndicator size="small" color="#0f766e" />
-            <Text className="text-sm font-medium text-gray-700">
+            <Text className="font-medium text-sm text-gray-700">
               Locating you…
             </Text>
           </View>

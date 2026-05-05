@@ -156,7 +156,7 @@ export function StopHikeConfirmModal({
           <View className="mb-4 items-center">
             <View className="h-1 w-12 rounded-full bg-gray-300" />
           </View>
-          <Text className="text-2xl font-bold text-gray-900">
+          <Text className="font-bold text-2xl text-gray-900">
             Save this hike?
           </Text>
 
@@ -186,7 +186,7 @@ export function StopHikeConfirmModal({
           </View>
 
           <View className="mt-5 gap-1.5">
-            <Text className="text-sm font-medium text-gray-700">
+            <Text className="font-medium text-sm text-gray-700">
               Name (optional)
             </Text>
             <TextInput

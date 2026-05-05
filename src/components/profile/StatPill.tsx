@@ -1,5 +1,14 @@
 import { Text, View } from 'react-native';
 
+import {
+  colors,
+  fontFamily,
+  fontSize,
+  lineHeight,
+  radius,
+  spacing,
+} from '@/lib/theme';
+
 type Props = {
   label: string;
   value: string;
@@ -12,34 +21,52 @@ export function StatPill({ label, value, suffix }: Props): React.JSX.Element {
       style={{
         flex: 1,
         height: 80,
-        borderRadius: 12,
-        padding: 12,
-        backgroundColor: '#f3f4f6',
+        borderRadius: radius.md,
+        padding: spacing.md,
+        backgroundColor: colors.surface,
+        borderWidth: 1,
+        borderColor: colors.border,
         justifyContent: 'space-between',
       }}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 4 }}>
+      <View
+        style={{
+          flexDirection: 'row',
+          alignItems: 'baseline',
+          gap: spacing.xs,
+        }}
+      >
         <Text
           style={{
-            fontSize: 22,
-            fontWeight: '500',
-            color: '#111827',
+            fontFamily: fontFamily.medium,
+            fontSize: fontSize.heading3,
+            lineHeight: lineHeight.heading3,
+            color: colors.textPrimary,
           }}
           numberOfLines={1}
         >
           {value}
         </Text>
         {suffix ? (
-          <Text style={{ fontSize: 14, color: '#6b7280' }} numberOfLines={1}>
+          <Text
+            style={{
+              fontFamily: fontFamily.regular,
+              fontSize: fontSize.body,
+              lineHeight: lineHeight.body,
+              color: colors.textSecondary,
+            }}
+            numberOfLines={1}
+          >
             {suffix}
           </Text>
         ) : null}
       </View>
       <Text
         style={{
-          fontSize: 10,
-          fontWeight: '500',
-          color: '#6b7280',
+          fontFamily: fontFamily.medium,
+          fontSize: fontSize.caption,
+          lineHeight: lineHeight.caption,
+          color: colors.textSecondary,
           letterSpacing: 1,
           textTransform: 'uppercase',
         }}

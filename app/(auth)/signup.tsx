@@ -86,7 +86,7 @@ export default function SignupScreen(): React.JSX.Element {
           keyboardShouldPersistTaps="handled"
         >
           <View className="gap-1">
-            <Text className="text-3xl font-bold text-gray-900">
+            <Text className="font-bold text-3xl text-gray-900">
               Create your account
             </Text>
             <Text className="text-base text-gray-600">

@@ -120,7 +120,7 @@ export function CreateCrewSheet({
           {createdCrew ? (
             <View className="gap-5">
               <View className="items-center gap-2">
-                <Text className="text-2xl font-bold text-gray-900">
+                <Text className="font-bold text-2xl text-gray-900">
                   Crew ready
                 </Text>
                 <Text className="text-center text-sm text-gray-600">
@@ -128,7 +128,7 @@ export function CreateCrewSheet({
                 </Text>
               </View>
               <View className="items-center rounded-2xl bg-teal-50 px-6 py-6">
-                <Text className="text-5xl font-bold tracking-[6px] text-teal-700">
+                <Text className="font-bold text-5xl tracking-[6px] text-teal-700">
                   {createdCrew.code}
                 </Text>
               </View>
@@ -159,7 +159,7 @@ export function CreateCrewSheet({
           ) : (
             <View className="gap-5">
               <View className="gap-1">
-                <Text className="text-2xl font-bold text-gray-900">
+                <Text className="font-bold text-2xl text-gray-900">
                   Create a crew
                 </Text>
                 <Text className="text-sm text-gray-600">
@@ -168,7 +168,7 @@ export function CreateCrewSheet({
               </View>
 
               <View className="gap-1.5">
-                <Text className="text-sm font-medium text-gray-700">
+                <Text className="font-medium text-sm text-gray-700">
                   Crew name (optional)
                 </Text>
                 <TextInput

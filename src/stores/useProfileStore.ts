@@ -92,9 +92,7 @@ export const useProfileStore = create<ProfileState>((set, get) => ({
     return { error: null };
   },
 
-  updateAvatarSeed: async (
-    next: string,
-  ): Promise<{ error: string | null }> => {
+  updateAvatarSeed: async (next: string): Promise<{ error: string | null }> => {
     const current = get().profile;
     if (!current) return { error: 'No profile loaded' };
     set({ profile: { ...current, avatar_seed: next } });
