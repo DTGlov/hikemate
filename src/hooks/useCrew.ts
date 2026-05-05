@@ -32,6 +32,9 @@ export function useCrew(): UseCrewResult {
   const updateMemberPosition = useCrewStore((s) => s.updateMemberPosition);
   const updateMemberStats = useCrewStore((s) => s.updateMemberStats);
   const setMeetingPointLocal = useCrewStore((s) => s.setMeetingPointLocal);
+  const setCrewScheduledStartLocal = useCrewStore(
+    (s) => s.setCrewScheduledStartLocal,
+  );
   const recordArrival = useCrewStore((s) => s.recordArrival);
   const setArrivals = useCrewStore((s) => s.setArrivals);
   const setOnlineUserIds = useCrewStore((s) => s.setOnlineUserIds);
@@ -92,6 +95,10 @@ export function useCrew(): UseCrewResult {
         if (cancelled) return;
         setMeetingPointLocal(point);
       },
+      onScheduledStartChanged: (next) => {
+        if (cancelled) return;
+        setCrewScheduledStartLocal(next);
+      },
       onArrival: (userId, arrivedAt) => {
         if (cancelled) return;
         recordArrival(userId, arrivedAt);
@@ -122,6 +129,7 @@ export function useCrew(): UseCrewResult {
     updateMemberPosition,
     updateMemberStats,
     setMeetingPointLocal,
+    setCrewScheduledStartLocal,
     recordArrival,
     setOnlineUserIds,
     setChannel,
@@ -198,16 +206,30 @@ export async function createCrew(params: {
   hostColor: string;
   hostAvatarSeed: string;
   name: string | null;
+  /** Phase 8 — optional ISO-8601 string. Schedules a 30-min pre-hike
+   *  reminder on every member's phone when set. */
+  scheduledStartAt?: string | null;
 }): Promise<{ crew: HikeCrew | null; error: string | null }> {
-  const { hostUserId, hostDisplayName, hostColor, hostAvatarSeed, name } =
-    params;
+  const {
+    hostUserId,
+    hostDisplayName,
+    hostColor,
+    hostAvatarSeed,
+    name,
+    scheduledStartAt = null,
+  } = params;
 
   const MAX_RETRIES = 5;
   for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
     const code = generateCrewCode();
     const { data, error } = await supabase
       .from('hike_rooms')
-      .insert({ code, name, host_id: hostUserId })
+      .insert({
+        code,
+        name,
+        host_id: hostUserId,
+        scheduled_start_at: scheduledStartAt,
+      })
       .select('*')
       .single();
     if (!error && data) {

@@ -22,6 +22,7 @@ import {
 } from '@/components/profile/EditDisplayNameModal';
 import { ProfileRow } from '@/components/profile/ProfileRow';
 import { StatPill } from '@/components/profile/StatPill';
+import { NotificationSettings } from '@/components/profile/NotificationSettings';
 import { OfflineMapsSection } from '@/components/settings/OfflineMapsSection';
 import { UnitToggle } from '@/components/settings/UnitToggle';
 import { useBiometricLockPref } from '@/hooks/useBiometricLockPref';
@@ -133,6 +134,10 @@ export default function ProfileScreen(): React.JSX.Element {
         <Section title="Preferences">
           <UnitsBlock />
           <BiometricRow />
+        </Section>
+
+        <Section title="Notifications">
+          <NotificationSettings />
         </Section>
 
         <Section title="Offline Maps">

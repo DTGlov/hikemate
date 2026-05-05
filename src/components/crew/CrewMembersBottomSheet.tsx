@@ -2,12 +2,15 @@ import BottomSheet, { BottomSheetView } from '@gorhom/bottom-sheet';
 import { formatDistanceToNow } from 'date-fns';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import * as SecureStore from 'expo-secure-store';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, Pressable, Share, Text, View } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
 
 import { Avatar } from '@/components/avatar/Avatar';
+import { NotificationPermissionExplainer } from '@/components/notifications/NotificationPermissionExplainer';
+import { useNotificationPermission } from '@/hooks/useNotificationPermission';
 import { endCrewAsHost, leaveCrew } from '@/hooks/useCrew';
 import { formatDistance, formatDuration, formatPace } from '@/lib/units';
 import { useCrewStore } from '@/stores/useCrewStore';
@@ -54,6 +57,8 @@ function statusLine(position: MemberLivePosition | null): string {
   return `Offline · ${formatDistanceToNow(position.timestamp, { addSuffix: true })}`;
 }
 
+const NOTIF_EXPLAINER_SHOWN_KEY = 'hikemate.notifExplainerShown';
+
 export function CrewMembersBottomSheet(): React.JSX.Element | null {
   const crew = useCrewStore((s) => s.crew);
   const members = useCrewStore((s) => s.members);
@@ -63,6 +68,45 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
   const myUserId = useCrewStore((s) => s.myUserId);
   const isHost = useCrewStore((s) => s.isHost);
   const unitSystem = useProfileStore((s) => s.profile?.unit_system ?? 'metric');
+  const {
+    status: notifPermissionStatus,
+    request: requestNotifPermission,
+  } = useNotificationPermission();
+  const [showNotifExplainer, setShowNotifExplainer] = useState(false);
+  const [isRequestingNotif, setIsRequestingNotif] = useState(false);
+
+  // First time the user enters a crew with notifications still
+  // undetermined, surface the explainer. Persisted flag in SecureStore
+  // means we never re-prompt after the user has seen it once — they can
+  // enable from Profile → Notifications later.
+  useEffect(() => {
+    if (!crew) return;
+    if (notifPermissionStatus !== 'undetermined') return;
+    let cancelled = false;
+    void SecureStore.getItemAsync(NOTIF_EXPLAINER_SHOWN_KEY).then((seen) => {
+      if (cancelled) return;
+      if (seen === '1') return;
+      setShowNotifExplainer(true);
+    });
+    return (): void => {
+      cancelled = true;
+    };
+  }, [crew, notifPermissionStatus]);
+
+  const dismissNotifExplainer = useCallback(async (): Promise<void> => {
+    setShowNotifExplainer(false);
+    await SecureStore.setItemAsync(NOTIF_EXPLAINER_SHOWN_KEY, '1');
+  }, []);
+
+  const onNotifContinue = useCallback(async (): Promise<void> => {
+    setIsRequestingNotif(true);
+    try {
+      await requestNotifPermission();
+    } finally {
+      setIsRequestingNotif(false);
+      await dismissNotifExplainer();
+    }
+  }, [dismissNotifExplainer, requestNotifPermission]);
 
   // Self stats from the local hike-tracking store — don't wait for our
   // own broadcast to round-trip via the channel.
@@ -109,6 +153,13 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
   if (!crew) return null;
 
   return (
+    <>
+    <NotificationPermissionExplainer
+      visible={showNotifExplainer}
+      isWorking={isRequestingNotif}
+      onContinue={() => void onNotifContinue()}
+      onLater={() => void dismissNotifExplainer()}
+    />
     <BottomSheet
       ref={sheetRef}
       snapPoints={SNAP_POINTS}
@@ -124,7 +175,10 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
       <BottomSheetView
         style={{ flex: 1, paddingHorizontal: 16, paddingTop: 8 }}
       >
-        <CrewHeader code={crew.code} />
+        <CrewHeader
+          code={crew.code}
+          scheduledStartAt={crew.scheduled_start_at}
+        />
 
         <View
           style={{
@@ -183,11 +237,32 @@ export function CrewMembersBottomSheet(): React.JSX.Element | null {
         {isHost ? <EndCrewButton /> : <LeaveCrewButton />}
       </BottomSheetView>
     </BottomSheet>
+    </>
   );
 }
 
-function CrewHeader({ code }: { code: string }): React.JSX.Element {
+function formatScheduledStart(iso: string): string | null {
+  const ts = new Date(iso).getTime();
+  if (!Number.isFinite(ts)) return null;
+  if (ts <= Date.now()) return null;
+  return new Date(ts).toLocaleString(undefined, {
+    weekday: 'short',
+    hour: 'numeric',
+    minute: '2-digit',
+  });
+}
+
+function CrewHeader({
+  code,
+  scheduledStartAt,
+}: {
+  code: string;
+  scheduledStartAt: string | null;
+}): React.JSX.Element {
   const [copied, setCopied] = useState(false);
+  const startLabel = scheduledStartAt
+    ? formatScheduledStart(scheduledStartAt)
+    : null;
 
   useEffect(() => {
     if (!copied) return;
@@ -246,6 +321,12 @@ function CrewHeader({ code }: { code: string }): React.JSX.Element {
           {copied ? 'Code copied' : 'Tap to copy'}
         </Text>
       </Pressable>
+
+      {startLabel ? (
+        <Text style={{ fontSize: 12, color: COLOR.muted }}>
+          Hike at {startLabel}
+        </Text>
+      ) : null}
 
       <Pressable
         accessibilityRole="button"
