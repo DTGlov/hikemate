@@ -19,6 +19,9 @@ export type CrewChannelCallbacks = {
   onMemberUpdated: (member: CrewMember) => void;
   onCrewEnded: () => void;
   onMeetingPointChanged: (point: MeetingPoint | null) => void;
+  /** Phase 8 — fires on every hike_rooms UPDATE so members can reschedule
+   *  their pre-hike reminder if the host changes the start time. */
+  onScheduledStartChanged: (scheduledStartAt: string | null) => void;
   onArrival: (userId: string, arrivedAt: string) => void;
   onPositionBroadcast: (broadcast: MemberPositionBroadcast) => void;
   onCrewStatsBroadcast: (broadcast: CrewStatsBroadcast) => void;
@@ -98,6 +101,7 @@ export function subscribeToCrew(
         const next = payload.new as HikeCrew;
         if (next.ended_at) callbacks.onCrewEnded();
         callbacks.onMeetingPointChanged(extractMeetingPoint(next));
+        callbacks.onScheduledStartChanged(next.scheduled_start_at);
       },
     )
     .on(

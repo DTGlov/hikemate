@@ -27,6 +27,8 @@ import { useHikeLifecycle } from '@/hooks/useHikeLifecycle';
 import { useHikeOutboxSync } from '@/hooks/useHikeOutboxSync';
 import { useMeetingPointGeofence } from '@/hooks/useMeetingPointGeofence';
 import { useOnlineState } from '@/hooks/useOnlineState';
+import { usePauseRecoveryNudge } from '@/hooks/usePauseRecoveryNudge';
+import { usePreHikeReminder } from '@/hooks/usePreHikeReminder';
 import {
   clearActiveCrewId,
   clearPendingCrewCode,
@@ -40,6 +42,7 @@ import { clearOutbox } from '@/lib/hikeOutbox';
 import { clearInProgressHike } from '@/lib/hikePersistence';
 import { initMapbox } from '@/lib/mapbox';
 import { colorForUser } from '@/lib/memberColor';
+import { configureNotificationHandler } from '@/lib/notifications';
 import { supabase } from '@/lib/supabase';
 import { fontFamily } from '@/lib/theme';
 import { useAuthStore } from '@/stores/useAuthStore';
@@ -69,6 +72,10 @@ TextWithDefaults.defaultProps.style = {
 // Keep the native splash up until JS + fonts are ready. preventAutoHideAsync
 // is safe to call multiple times; failures are non-fatal (catch swallows).
 SplashScreen.preventAutoHideAsync().catch(() => undefined);
+
+// Phase 8 — configure foreground notification rendering once at module
+// load so handlers are wired before any schedule resolves.
+configureNotificationHandler();
 
 function extractCrewCodeFromUrl(url: string): string | null {
   try {
@@ -171,6 +178,8 @@ export default function RootLayout(): React.JSX.Element {
   useMeetingPointGeofence();
   useOnlineState();
   useHikeOutboxSync();
+  usePreHikeReminder();
+  usePauseRecoveryNudge();
 
   const restoredRef = useRef(false);
 

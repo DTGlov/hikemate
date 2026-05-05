@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { Button } from '@/components/Button';
+import { StartTimePicker } from '@/components/crew/StartTimePicker';
 import { setActiveCrewId } from '@/lib/activeCrewPersistence';
 import { emailToDisplayName } from '@/lib/displayName';
 import { colorForUser } from '@/lib/memberColor';
@@ -38,6 +39,7 @@ export function CreateCrewSheet({
   );
 
   const [name, setName] = useState('');
+  const [scheduledStart, setScheduledStart] = useState<Date | null>(null);
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createdCrew, setCreatedCrew] = useState<HikeCrew | null>(null);
@@ -59,6 +61,7 @@ export function CreateCrewSheet({
       hostColor: colorForUser(userId),
       hostAvatarSeed: profileAvatarSeed ?? userId,
       name: name.trim() ? name.trim() : `${displayName}'s Hike`,
+      scheduledStartAt: scheduledStart ? scheduledStart.toISOString() : null,
     });
     setIsCreating(false);
     if (createError || !crew) {
@@ -71,6 +74,7 @@ export function CreateCrewSheet({
 
   const handleClose = (): void => {
     setName('');
+    setScheduledStart(null);
     setCreatedCrew(null);
     setError(null);
     onClose();
@@ -179,6 +183,11 @@ export function CreateCrewSheet({
                   className="h-12 rounded-xl border border-gray-300 bg-white px-3.5 text-base text-gray-900"
                 />
               </View>
+
+              <StartTimePicker
+                value={scheduledStart}
+                onChange={setScheduledStart}
+              />
 
               {error ? (
                 <Text className="text-sm text-red-600">{error}</Text>

@@ -13,6 +13,9 @@ export interface HikeCrew {
   meeting_point_lng: number | null;
   meeting_point_label: string | null;
   meeting_point_set_at: string | null;
+  // Phase 8 — optional crew start time. When set by the host, every member's
+  // phone schedules a local "starts in 30 minutes" reminder.
+  scheduled_start_at: string | null;
 }
 
 /**

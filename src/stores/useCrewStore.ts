@@ -60,6 +60,10 @@ type CrewState = {
   snapshotForSummary: () => void;
   clearLastEndedCrew: () => void;
 
+  // Phase 8 — react to remote updates of scheduled_start_at without
+  // overwriting the rest of the crew row.
+  setCrewScheduledStartLocal: (next: string | null) => void;
+
   // Phase 7 — meeting point + arrivals.
   setMeetingPointLocal: (next: MeetingPoint | null) => void;
   setMeetingPointRemote: (
@@ -265,6 +269,13 @@ export const useCrewStore = create<CrewState>((set, get) => ({
 
   clearLastEndedCrew: (): void => {
     set({ lastEndedCrew: null });
+  },
+
+  setCrewScheduledStartLocal: (next): void => {
+    const state = get();
+    if (!state.crew) return;
+    if (state.crew.scheduled_start_at === next) return;
+    set({ crew: { ...state.crew, scheduled_start_at: next } });
   },
 
   setMeetingPointLocal: (next): void => {
